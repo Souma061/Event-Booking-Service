@@ -10,6 +10,7 @@
 # capacity = 3
 # refill = 1 token / 20 sec
 
+import math
 import time
 from collections import defaultdict
 
@@ -33,6 +34,11 @@ class TokenBucket:
             self.tokens -= 1
             return True
         return False
+
+    def retry_after_seconds(self) -> int:
+        if self.tokens >= 1:
+            return 0
+        return max(1, math.ceil((1 - self.tokens) / self.refill_rate))
 
 
 # buckets = defaultdict(lambda: TokenBucket(capacity=5, refill_rate=1/12))
