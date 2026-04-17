@@ -63,7 +63,7 @@ class Payment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
-    Booking = relationship("Booking", back_populates="payments")
+    booking = relationship("Booking", back_populates="payments")
 
 
 class Ticket(Base):

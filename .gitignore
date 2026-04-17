@@ -9,3 +9,5 @@ __pycache__/
 *.bak
 *.swp
 .DS_Store
+.codex
+PROJECT_ANALYSIS.md
