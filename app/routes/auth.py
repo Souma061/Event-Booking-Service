@@ -6,7 +6,7 @@ from app.database import get_db
 from app.dependencies.auth import get_current_active_user
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, Userout
-from app.utils.rate_limit import login_buckets
+from app.utils.rate_limit import get_rate_limit_client_ip, login_buckets
 from app.utils.security import create_access_token, hash_password, verify_password
 
 
@@ -14,12 +14,7 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 
 def _get_login_rate_limit_key(request: Request, email: str) -> str:
-    forwarded_for = request.headers.get("x-forwarded-for")
-    client_ip = (
-        forwarded_for.split(",")[0].strip()
-        if forwarded_for
-        else request.client.host if request.client else "unknown"
-    )
+    client_ip = get_rate_limit_client_ip(request)
     return f"{client_ip}:{email.lower()}"
 
 

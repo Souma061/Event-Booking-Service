@@ -2,6 +2,7 @@ from decimal import Decimal
 import razorpay
 from app.config import settings
 
+
 class RazorpayService:
     def __init__(self) -> None:
         self._client = None
@@ -24,21 +25,23 @@ class RazorpayService:
                 "notes": notes or {},
                 "payment_capture": 1
             }
-    )
+        )
 
-def verify_signature(self, order_id: str, payment_id: str, signature: str) -> bool:
-    client = self._ensure_client()
-    payload = {
-        "razorpay_order_id": order_id,
-        "razorpay_payment_id": payment_id,
-        "razorpay_signature": signature
-    }
-    try:
-        client.utility.verify_payment_signature(payload)
-        return True
-    except Exception:
-        return False
+    def verify_signature(self, order_id: str, payment_id: str, signature: str) -> bool:
+        client = self._ensure_client()
+        payload = {
+            "razorpay_order_id": order_id,
+            "razorpay_payment_id": payment_id,
+            "razorpay_signature": signature
+        }
+        utility = getattr(client, "utility", None)
+        if utility is None:
+            raise RuntimeError("Razorpay client utility helper is unavailable.")
+        try:
+            utility.verify_payment_signature(payload)
+            return True
+        except Exception:
+            return False
 
 razorpay_service = RazorpayService()
-
 
