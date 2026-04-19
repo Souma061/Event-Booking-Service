@@ -1,0 +1,212 @@
+/* ─── Event Detail ─── */
+.event-detail {
+  flex: 1;
+  padding-block: var(--space-xl) var(--space-3xl);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--clr-text-2);
+  text-decoration: none;
+  margin-bottom: var(--space-xl);
+  transition: color var(--duration) var(--ease-out);
+}
+
+.back-link:hover { color: var(--clr-white); }
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: var(--space-xl);
+  align-items: start;
+}
+
+/* Banner */
+.detail-main {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.detail-banner {
+  height: 220px;
+  position: relative;
+  overflow: hidden;
+}
+
+.detail-banner-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.6));
+}
+
+.detail-banner-cat {
+  position: absolute;
+  bottom: 16px;
+  left: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.9);
+  background: rgba(0,0,0,0.4);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  backdrop-filter: blur(6px);
+}
+
+.detail-content {
+  padding: var(--space-xl);
+}
+
+.detail-content h1 {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  margin-bottom: var(--space-md);
+}
+
+.detail-desc {
+  font-size: 0.9375rem;
+  color: var(--clr-text-2);
+  line-height: 1.7;
+  margin-bottom: var(--space-xl);
+}
+
+.detail-attrs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--clr-border);
+}
+
+.detail-attr {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--clr-accent-2);
+}
+
+.detail-attr > svg { margin-top: 2px; flex-shrink: 0; }
+
+.attr-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--clr-text-3);
+  margin-bottom: 2px;
+}
+
+.attr-val {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--clr-text);
+}
+
+/* Shows Panel */
+.shows-panel {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.shows-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9375rem;
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--clr-border);
+  color: var(--clr-text-2);
+}
+
+.shows-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) 0;
+  color: var(--clr-text-3);
+}
+
+.shows-empty p { font-size: 0.875rem; text-align: center; }
+
+.show-card {
+  background: var(--clr-bg-2);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  transition: border-color var(--duration) var(--ease-out);
+}
+
+.show-card.ACTIVE {
+  border-color: rgba(16,185,129,0.2);
+}
+
+.show-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.show-date, .show-end {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  color: var(--clr-text-2);
+}
+
+.show-date { font-weight: 500; color: var(--clr-text); }
+
+.show-unavailable {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--clr-text-3);
+}
+
+.shows-no-active {
+  font-size: 0.8125rem;
+  color: var(--clr-text-3);
+  text-align: center;
+  padding: var(--space-sm) 0;
+}
+
+/* Page state */
+.detail-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  min-height: 60vh;
+}
+
+/* Responsive */
+@media (max-width: 960px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+  .detail-attrs {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .detail-attrs { grid-template-columns: 1fr; }
+}
