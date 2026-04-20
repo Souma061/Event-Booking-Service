@@ -52,6 +52,7 @@ def on_startup():
     Base.metadata.create_all(bind=engine)
 
 
+
 @app.get("/")
 def read_root():
     return {"message": f"{settings.APP_NAME} is running"}
