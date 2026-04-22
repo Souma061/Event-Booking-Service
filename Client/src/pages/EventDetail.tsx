@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Calendar, MapPin, Clock, Users, ArrowLeft, Tag, Ticket } from 'lucide-react';
 import api from '../lib/api';
 import type { EventOut, VenueOut, ShowOut, ShowAvailabilityOut } from '../types';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import BookingModal from '../components/BookingModal';
 import './EventDetail.css';
 

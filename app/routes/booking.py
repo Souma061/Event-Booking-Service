@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends,HTTPException,Header,Request,status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from app.config import settings
 from app.database import get_db
 from app.dependencies.auth import get_current_active_user
 from app.models.booking import Booking,BookingItem
@@ -53,19 +52,21 @@ def create_booking(
     show = db.get(Show, payload.show_id)
     if not show or show.status != "ACTIVE":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Show not found or not active")
-    request_hash = hashlib.sha256(
-        json.dumps(payload.model_dump(), sort_keys=True).encode() + idempotency_key.encode("utf-8")
+
+    payload_hash = hashlib.sha256(
+        json.dumps(payload.model_dump(mode="json"), sort_keys=True).encode("utf-8")
     ).hexdigest()
+
     existing = db.execute(
         select(Booking).where(
             Booking.user_id == current_user.id,
-            Booking.idempotency_key == request_hash,
+            Booking.idempotency_key == idempotency_key,
         )
     ).scalar_one_or_none()
 
     if existing:
-        if existing.request_hash != request_hash:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Idempotency-Key conflict")
+        if existing.request_hash != payload_hash:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Idempotency-Key conflict")
         return existing
 
     rate_limit_key = f"{get_rate_limit_client_ip(request)}:{current_user.id}"
@@ -120,7 +121,7 @@ def create_booking(
             total_amount = total_amount,
             idempotency_key = idempotency_key,
             currency = "INR",
-            request_hash = request_hash,
+            request_hash = payload_hash,
         )
         db.add(booking)
         db.flush()
@@ -139,12 +140,12 @@ def create_booking(
         existing = db.execute(
             select(Booking).where(
                 Booking.user_id == current_user.id,
-                Booking.idempotency_key == request_hash,
+                Booking.idempotency_key == idempotency_key,
             )
         ).scalar_one_or_none()
         if existing:
             return existing
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Booking creation failed due to a conflict. Please retry with the same Idempotency-Key or use a new one.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Booking creation failed due to a conflict. Please retry with the same Idempotency-Key or use a new one.")
     except Exception:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred while creating the booking. Please try again later.")
@@ -157,5 +158,4 @@ def my_bookings(
 ):
     return db.execute(
         select(Booking).where(Booking.user_id == current_user.id).order_by(Booking.created_at.desc())
-    )
-
+    ).scalars().all()

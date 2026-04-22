@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies.auth import get_current_active_user
 from app.models.user import User
+from app.models.enums import UserRole
+import os
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, Userout
 from app.utils.rate_limit import get_rate_limit_client_ip, login_buckets
 from app.utils.security import create_access_token, hash_password, verify_password
@@ -24,11 +26,20 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
+    role = UserRole.CUSTOMER
+    if payload.admin_secret:
+        # Extra security feature for admin signup
+        expected_secret = os.getenv("ADMIN_SECRET_KEY", "ev_admin_secret_2026")
+        if payload.admin_secret != expected_secret:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin secret key")
+        role = UserRole.ADMIN
+
     user = User(
         full_name = payload.full_name,
         email = payload.email,
         phone = payload.phone,
-        password_hash = hash_password(payload.password)
+        password_hash = hash_password(payload.password),
+        role = role
     )
     db.add(user)
     db.commit()

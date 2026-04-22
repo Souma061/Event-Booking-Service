@@ -1,4 +1,4 @@
-from fastapi import APIRouter,Depends,HTTPException,status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -20,8 +20,26 @@ from app.schemas.event import (
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
+
+@router.get("", response_model=list[EventOut])
+def list_events(db: Session = Depends(get_db)):
+    return db.execute(select(Event).order_by(Event.created_at.desc())).scalars().all()
+
+
+@router.get("/venues", response_model=list[VenueOut])
+def list_venues(db: Session = Depends(get_db)):
+    return db.execute(select(Venue).order_by(Venue.id.desc())).scalars().all()
+
+
+@router.get("/venues/{venue_id}", response_model=VenueOut)
+def get_venue(venue_id: int, db: Session = Depends(get_db)):
+    venue = db.get(Venue, venue_id)
+    if not venue:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venue not found")
+    return venue
+
 @router.post("/venues", response_model = VenueOut,status_code=status.HTTP_201_CREATED)
-def create_venue(payload = VenueCreate,db: Session = Depends(get_db),_: User = Depends(require_admin)):
+def create_venue(payload: VenueCreate, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     venue = Venue(name = payload.name,city = payload.city,address = payload.address)
     db.add(venue)
     db.commit()
@@ -39,7 +57,7 @@ def create_event(payload: EventCreate, db: Session = Depends(get_db), admin_user
         description=payload.description,
         category=payload.category,
         venue_id=payload.venue_id,
-        created_by=admin_user.id
+        created_by_user_id=admin_user.id
     )
     db.add(event)
     db.commit()
@@ -51,7 +69,7 @@ def create_event(payload: EventCreate, db: Session = Depends(get_db), admin_user
 def create_show(event_id: int, payload: ShowCreate,db: Session = Depends(get_db), _: User = Depends(require_admin)):
     event = db.get(Event,event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid event_id")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     if payload.end_at <= payload.start_at:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="end_at must be after start_at")
@@ -77,7 +95,7 @@ def upsert_show_inventory(
 ):
     show = db.get(Show,show_id)
     if not show:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid show_id")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Show not found")
 
     out_rows = []
     for row in payload:
@@ -97,12 +115,14 @@ def upsert_show_inventory(
                 )
             inv.total_seats = row.total_seats
             inv.available_seats = row.total_seats - already_sold
+            inv.price = row.price
         else:
             inv = SeatCategoryInventory(
                 show_id = show_id,
                 category = row.category,
                 total_seats = row.total_seats,
-                available_seats = row.total_seats
+                available_seats = row.total_seats,
+                price = row.price,
             )
             db.add(inv)
         out_rows.append(inv)
@@ -119,7 +139,17 @@ def list_event_shows(
 ):
     event = db.get(Event,event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid event_id")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
-    shows = db.execute(select(Show).where(Show.event_id == event_id)).scalars().all()
+    shows = db.execute(
+        select(Show).where(Show.event_id == event_id).order_by(Show.start_at.asc())
+    ).scalars().all()
     return shows
+
+
+@router.get("/{event_id}", response_model=EventOut)
+def get_event(event_id: int, db: Session = Depends(get_db)):
+    event = db.get(Event, event_id)
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    return event

@@ -10,6 +10,8 @@ import Events from './pages/Events';
 import EventDetail from './pages/EventDetail';
 import Bookings from './pages/Bookings';
 import NotFound from './pages/NotFound';
+import Admin from './pages/Admin';
+import Me from './pages/Me';
 
 function AppLayout() {
   return (
@@ -26,6 +28,22 @@ function AppLayout() {
           element={
             <ProtectedRoute>
               <Bookings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/me"
+          element={
+            <ProtectedRoute>
+              <Me />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute adminOnly>
+              <Admin />
             </ProtectedRoute>
           }
         />

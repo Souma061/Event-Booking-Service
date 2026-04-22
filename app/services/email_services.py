@@ -20,14 +20,17 @@ async def send_booking_confirmation_email(to_email: str,booking_id:int, ticket_c
     ticket_list = "\n".join(f"- {code}" for code in ticket_codes)
     msg.set_content(f"Thank you for your booking! Your booking ID is {booking_id}.\n\nYour ticket codes:\n{ticket_list}\n\nPlease keep this email for your records.")
 
-    await aiosmtplib.send(
-        msg,
-        hostname=settings.SMTP_HOST,
-        port=settings.SMTP_PORT,
-        username=settings.SMTP_USERNAME,
-        password=settings.SMTP_PASSWORD or None,
-        start_tls=True
-    )
+    try:
+        await aiosmtplib.send(
+            msg,
+            hostname=settings.SMTP_HOST,
+            port=settings.SMTP_PORT,
+            username=settings.SMTP_USERNAME,
+            password=settings.SMTP_PASSWORD or None,
+            start_tls=True
+        )
+    except Exception as e:
+        logger.warning(f"SMTP email logic failed (Fake or missing credentials): {e}")
 
 
 def send_booking_confirmation_email_sync(to_email: str,booking_id:int, ticket_codes: list[str]) -> None:

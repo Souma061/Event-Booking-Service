@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Ticket, Menu, X, LogOut, User, LayoutDashboard, ChevronDown } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import './Navbar.css';
 
 export default function Navbar() {
@@ -70,7 +70,7 @@ export default function Navbar() {
                   </div>
                   <div className="dropdown-divider" />
                   <Link
-                    to="/profile"
+                    to="/me"
                     className="dropdown-item"
                     role="menuitem"
                     onClick={() => setDropdownOpen(false)}

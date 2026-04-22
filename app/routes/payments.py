@@ -68,6 +68,14 @@ def create_payment_order(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to create payment order with Razorpay",
         )
+    except Exception as e:
+        print(f"DEBUG: Exception in Razorpay create_order: {repr(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Payment provider error while creating order",
+        )
 
     payment = Payment(
         booking_id=booking.id,
@@ -120,11 +128,22 @@ def verify_payment(
             ticket_codes=codes,
         )
 
-    signature_ok = razorpay_service.verify_signature(
-        order_id=payload.provider_order_id,
-        payment_id=payload.provider_payment_id,
-        signature=payload.provider_signature,
-    )
+    try:
+        signature_ok = razorpay_service.verify_signature(
+            order_id=payload.provider_order_id,
+            payment_id=payload.provider_payment_id,
+            signature=payload.provider_signature,
+        )
+    except RuntimeError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Payment provider is not configured",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Payment provider error while verifying payment",
+        )
 
     payment.provider_payment_id = payload.provider_payment_id
     payment.provider_signature = payload.provider_signature

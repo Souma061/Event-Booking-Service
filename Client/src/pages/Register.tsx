@@ -1,8 +1,9 @@
-import { useState, FormEvent } from 'react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Phone, Ticket, AlertCircle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, Ticket, AlertCircle, CheckCircle, Shield } from 'lucide-react';
 import api from '../lib/api';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import type { TokenResponse } from '../types';
 import './Auth.css';
 
@@ -16,7 +17,9 @@ export default function Register() {
     phone: '',
     password: '',
     confirm_password: '',
+    admin_secret: '',
   });
+  const [isAdminRegistration, setIsAdminRegistration] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -44,13 +47,17 @@ export default function Register() {
     setLoading(true);
     setError('');
     try {
-      // Register
-      await api.post('/api/auth/register', {
+      const payload: Record<string, string> = {
         full_name: form.full_name,
         email: form.email,
         phone: form.phone,
         password: form.password,
-      });
+      };
+      if (isAdminRegistration && form.admin_secret) {
+        payload.admin_secret = form.admin_secret;
+      }
+      
+      await api.post('/api/auth/register', payload);
       // Auto-login
       const { data } = await api.post<TokenResponse>('/api/auth/login', {
         email: form.email,
@@ -201,6 +208,39 @@ export default function Register() {
                   </div>
                 </div>
               </div>
+
+              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  id="admin-toggle" 
+                  checked={isAdminRegistration} 
+                  onChange={(e) => setIsAdminRegistration(e.target.checked)} 
+                  style={{ cursor: 'pointer' }}
+                />
+                <label htmlFor="admin-toggle" className="form-label" style={{ margin: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Shield size={14} color="var(--clr-gold)" />
+                  Register as Admin
+                </label>
+              </div>
+
+              {isAdminRegistration && (
+                <div className="form-group slide-down">
+                  <label className="form-label" htmlFor="reg-admin-secret">Admin Secret Key</label>
+                  <div className="input-wrap">
+                    <Shield size={16} className="input-icon" aria-hidden="true" color="var(--clr-gold)" />
+                    <input
+                      id="reg-admin-secret"
+                      name="admin_secret"
+                      type="password"
+                      className="form-input with-icon"
+                      placeholder="Enter the secret key to get admin rights"
+                      value={form.admin_secret}
+                      onChange={handleChange}
+                      required={isAdminRegistration}
+                    />
+                  </div>
+                </div>
+              )}
 
               <button
                 type="submit"

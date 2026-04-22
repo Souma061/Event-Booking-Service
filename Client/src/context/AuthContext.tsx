@@ -1,18 +1,8 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import api from '../lib/api';
 import type { UserOut } from '../types';
-
-interface AuthContextType {
-  user: UserOut | null;
-  token: string | null;
-  loading: boolean;
-  login: (token: string) => Promise<void>;
-  logout: () => void;
-  isAuthenticated: boolean;
-  isAdmin: boolean;
-}
-
-const AuthContext = createContext<AuthContextType | null>(null);
+import { AuthContext } from './authTypes';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserOut | null>(null);
@@ -21,20 +11,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
   const [loading, setLoading] = useState(!!localStorage.getItem('ev_token'));
 
-  const fetchMe = async () => {
-    try {
-      const { data } = await api.get<UserOut>('/api/auth/me');
-      setUser(data);
-    } catch {
-      setToken(null);
-      localStorage.removeItem('ev_token');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (token) fetchMe();
+    if (!token) return;
+    let cancelled = false;
+    const fetchMe = async () => {
+      try {
+        const { data } = await api.get<UserOut>('/api/auth/me');
+        if (!cancelled) setUser(data);
+      } catch {
+        if (!cancelled) {
+          setToken(null);
+          localStorage.removeItem('ev_token');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchMe();
+    return () => { cancelled = true; };
   }, [token]);
 
   const login = async (newToken: string) => {
@@ -65,10 +59,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
-  return ctx;
 }

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Calendar, MapPin, Zap, Shield, Star, Ticket, Music, Mic, Trophy } from 'lucide-react';
+import { ArrowRight, Calendar, Zap, Shield, Star, Ticket, Music, Mic, Trophy } from 'lucide-react';
 import './Home.css';
 
 const CATEGORIES = [
