@@ -50,15 +50,15 @@ export default function Footer() {
             <h4 className="footer-col-title">Support</h4>
             <nav>
               <a href="#" className="footer-link">Help Center</a>
-              <a href="#" className="footer-link">Contact Us</a>
-              <a href="#" className="footer-link">Cancellation Policy</a>
+              <Link to="/contact" className="footer-link">Contact Us</Link>
+              <Link to="/refund" className="footer-link">Cancellation Policy</Link>
             </nav>
           </div>
           <div className="footer-col">
             <h4 className="footer-col-title">Legal</h4>
             <nav>
               <a href="#" className="footer-link">Privacy Policy</a>
-              <a href="#" className="footer-link">Terms of Service</a>
+              <Link to="/terms" className="footer-link">Terms of Service</Link>
               <a href="#" className="footer-link">Cookie Policy</a>
             </nav>
           </div>
