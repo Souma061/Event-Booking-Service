@@ -12,6 +12,9 @@ import Bookings from './pages/Bookings';
 import NotFound from './pages/NotFound';
 import Admin from './pages/Admin';
 import Me from './pages/Me';
+import Terms from './pages/Terms';
+import Refund from './pages/Refund';
+import Contact from './pages/Contact';
 
 function AppLayout() {
   return (
@@ -47,6 +50,9 @@ function AppLayout() {
             </ProtectedRoute>
           }
         />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/refund" element={<Refund />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />
