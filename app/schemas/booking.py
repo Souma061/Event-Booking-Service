@@ -21,6 +21,14 @@ class BookingItemOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class TicketOut(BaseModel):
+    id: int
+    ticket_code: str
+    qr_image_base64: str | None = None
+    status: str
+
+    model_config = ConfigDict(from_attributes=True)
+
 class BookingOut(BaseModel):
     id: int
     user_id: int
@@ -30,5 +38,6 @@ class BookingOut(BaseModel):
     currency: str
     created_at: datetime
     items: list[BookingItemOut]
+    tickets: list[TicketOut] = []
 
     model_config = ConfigDict(from_attributes=True)

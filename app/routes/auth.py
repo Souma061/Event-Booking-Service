@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from hmac import compare_digest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies.auth import get_current_active_user
 from app.models.user import User
 from app.models.enums import UserRole
-import os
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, Userout
 from app.utils.rate_limit import get_rate_limit_client_ip, login_buckets
 from app.utils.security import create_access_token, hash_password, verify_password
@@ -28,9 +29,13 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 
     role = UserRole.CUSTOMER
     if payload.admin_secret:
-        # Extra security feature for admin signup
-        expected_secret = os.getenv("ADMIN_SECRET_KEY", "ev_admin_secret_2026")
-        if payload.admin_secret != expected_secret:
+        expected_secret = settings.ADMIN_SECRET_KEY
+        if not expected_secret:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin signup is disabled",
+            )
+        if not compare_digest(payload.admin_secret, expected_secret):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin secret key")
         role = UserRole.ADMIN
 

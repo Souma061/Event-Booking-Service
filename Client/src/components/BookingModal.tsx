@@ -1,8 +1,18 @@
 import { useState, useMemo } from 'react';
 import { X, Ticket, Plus, Minus, ShoppingCart, AlertCircle, CheckCircle } from 'lucide-react';
 import api from '../lib/api';
-import type { ShowOut, ShowAvailabilityOut, InventoryRowOut } from '../types';
+import type { ShowOut, ShowAvailabilityOut, InventoryRowOut, BookingOut, PaymentOrderOut } from '../types';
 import './BookingModal.css';
+
+function loadScript(src: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 interface Props {
   show: ShowOut;
@@ -61,18 +71,68 @@ export default function BookingModal({ show, availability, eventTitle, onClose }
     setLoading(true);
     setError('');
     try {
-      await api.post('/api/bookings', {
+      const { data: booking } = await api.post<BookingOut>('/api/bookings', {
         show_id: show.id,
         items: itemsToBook.map(i => ({ category: i.category, quantity: i.quantity })),
       }, {
         headers: { 'Idempotency-Key': buildIdempotencyKey() },
       });
-      setSuccess(true);
-      setTimeout(onClose, 2000);
+
+      const { data: paymentOrder } = await api.post<PaymentOrderOut>('/api/payments/orders', {
+        booking_id: booking.id
+      });
+
+      const scriptLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
+      if (!scriptLoaded) {
+        setError('Payment gateway failed to load. Please check your connection.');
+        setLoading(false);
+        return;
+      }
+
+      const options = {
+        key: paymentOrder.razorpay_key_id,
+        amount: paymentOrder.amount_in_paise,
+        currency: paymentOrder.currency,
+        name: eventTitle,
+        description: 'Ticket Booking',
+        order_id: paymentOrder.provider_order_id,
+        handler: async function (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string; }) {
+          try {
+            await api.post('/api/payments/verify', {
+              booking_id: paymentOrder.booking_id,
+              provider_order_id: response.razorpay_order_id,
+              provider_payment_id: response.razorpay_payment_id,
+              provider_signature: response.razorpay_signature,
+            });
+            setSuccess(true);
+            setTimeout(onClose, 2000);
+          } catch (verifyErr: unknown) {
+            const msg = (verifyErr as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+            setError(msg || 'Payment verification failed.');
+            setLoading(false);
+          }
+        },
+        theme: {
+          color: '#4b2d8b'
+        },
+        modal: {
+          ondismiss: function () {
+            setLoading(false);
+          }
+        }
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const razorpay = new (window as any).Razorpay(options);
+      razorpay.on('payment.failed', function (response: { error: { description: string } }) {
+        setError(response.error.description || 'Payment failed.');
+        setLoading(false);
+      });
+      razorpay.open();
+
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(msg || 'Booking failed. Please try again.');
-    } finally {
       setLoading(false);
     }
   };

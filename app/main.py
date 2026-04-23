@@ -2,6 +2,7 @@ from collections import defaultdict
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
 
 from app import models
@@ -24,17 +25,10 @@ rate_limit_exempt_paths = {"/", "/health", "/docs", "/openapi.json", "/redoc"}
 
 app = FastAPI(title=settings.APP_NAME)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.middleware("http")
 async def apply_default_rate_limit(request: Request, call_next):
+    if request.method == "OPTIONS":
+        return await call_next(request)
+        
     if request.url.path not in rate_limit_exempt_paths:
         bucket = default_buckets[get_rate_limit_client_ip(request)]
         if not bucket.allow():
@@ -45,6 +39,16 @@ async def apply_default_rate_limit(request: Request, call_next):
             )
 
     return await call_next(request)
+
+app.add_middleware(BaseHTTPMiddleware, dispatch=apply_default_rate_limit)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")

@@ -1,12 +1,13 @@
 import hashlib
 import json
+import asyncio
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends,HTTPException,Header,Request,status
+from fastapi import APIRouter, Depends,HTTPException,Header,Request,status, BackgroundTasks
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from app.database import get_db
+from sqlalchemy.exc import IntegrityError, OperationalError
+from app.database import get_db, SessionLocal
 from app.dependencies.auth import get_current_active_user
 from app.models.booking import Booking,BookingItem
 from app.models.event import Show,SeatCategoryInventory
@@ -19,6 +20,30 @@ from app.utils.rate_limit import booking_buckets, get_rate_limit_client_ip
 
 router  = APIRouter(prefix="/api/bookings",tags=["bookings"])
 
+async def expire_unpaid_booking(booking_id: int):
+    await asyncio.sleep(15 * 60)
+    db = SessionLocal()
+    try:
+        booking = db.get(Booking, booking_id)
+        if booking and booking.status == BookingStatus.PENDING_PAYMENT:
+            for item in booking.items:
+                inventory = db.execute(
+                    select(SeatCategoryInventory)
+                    .where(
+                        SeatCategoryInventory.show_id == booking.show_id,
+                        SeatCategoryInventory.category == item.category
+                    )
+                    .with_for_update()
+                ).scalar_one_or_none()
+                if inventory:
+                    inventory.available_seats += item.quantity
+            booking.status = BookingStatus.CANCELLED
+            db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Error expiring booking {booking_id}: {e}")
+    finally:
+        db.close()
 
 @router.get("/shows/{show_id}/availability",response_model=ShowAvailabilityOut)
 def show_availability(show_id:int, db: Session = Depends(get_db)):
@@ -41,6 +66,7 @@ def show_availability(show_id:int, db: Session = Depends(get_db)):
 def create_booking(
     request:Request,
     payload: BookingCreateRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
     idempotency_key: str | None = Header(default=None,
@@ -130,7 +156,16 @@ def create_booking(
                 BookingItem(booking_id= booking.id, **row))
         db.commit()
         db.refresh(booking)
+        
+        background_tasks.add_task(expire_unpaid_booking, booking.id)
+        
         return booking
+    except OperationalError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A concurrent transaction modified the seats. Please try again."
+        )
     except HTTPException:
         db.rollback()
         raise

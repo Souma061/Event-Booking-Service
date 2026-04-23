@@ -54,6 +54,30 @@ function BookingCard({ booking }: { booking: BookingOut }) {
           </div>
         )}
 
+        {/* Tickets & QR Codes */}
+        {booking.tickets && booking.tickets.length > 0 && (
+          <div className="booking-tickets" style={{ marginTop: '1rem' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--clr-text-2)', marginBottom: '0.5rem' }}>Your Tickets</div>
+            <div className="tickets-grid" style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+              {booking.tickets.map(ticket => (
+                <div key={ticket.id} className="ticket-item" style={{ flex: '0 0 auto', border: '1px solid var(--clr-border)', borderRadius: '8px', padding: '0.5rem', textAlign: 'center', background: 'var(--clr-surface-2)' }}>
+                  <div style={{ fontWeight: '500', fontSize: '0.75rem', marginBottom: '0.5rem', color: 'var(--clr-text)' }}>{ticket.ticket_code}</div>
+                  {ticket.qr_image_base64 && (
+                    <img 
+                      src={`data:image/png;base64,${ticket.qr_image_base64}`} 
+                      alt={`QR Code for ${ticket.ticket_code}`} 
+                      style={{ width: '80px', height: '80px', display: 'block', margin: '0 auto', borderRadius: '4px', background: 'white', padding: '4px' }} 
+                    />
+                  )}
+                  <div style={{ fontSize: '0.7rem', marginTop: '0.5rem', color: ticket.status === 'ACTIVE' ? 'var(--clr-emerald)' : 'var(--clr-rose)' }}>
+                    {ticket.status}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="booking-card-footer">
           <div className="booking-total">
             <span className="booking-total-label">Total</span>

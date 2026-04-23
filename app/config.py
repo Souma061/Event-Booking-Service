@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = Field(default="change_me_in_env")
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    ADMIN_SECRET_KEY: str | None = None
 
     RATE_LIMIT_DEFAULT: str = "120/minute"
     RATE_LIMIT_LOGIN: str = "10/minute"

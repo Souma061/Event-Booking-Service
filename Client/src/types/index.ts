@@ -86,6 +86,13 @@ export interface BookingItemOut {
   line_total: string;
 }
 
+export interface TicketOut {
+  id: number;
+  ticket_code: string;
+  qr_image_base64: string | null;
+  status: string;
+}
+
 export type BookingStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'CANCELLED' | 'FAILED';
 
 export interface BookingOut {
@@ -97,4 +104,31 @@ export interface BookingOut {
   currency: string;
   created_at: string;
   items: BookingItemOut[];
+  tickets: TicketOut[];
+}
+
+/* ─── Payments ─── */
+export interface PaymentOrderCreateRequest {
+  booking_id: number;
+}
+
+export interface PaymentOrderOut {
+  booking_id: number;
+  provider_order_id: string;
+  amount_in_paise: number;
+  currency: string;
+  razorpay_key_id: string;
+}
+
+export interface PaymentVerificationRequest {
+  booking_id: number;
+  provider_order_id: string;
+  provider_payment_id: string;
+  provider_signature: string;
+}
+
+export interface PaymentVerificationOut {
+  booking_id: number;
+  status: string;
+  ticket_codes: string[];
 }
