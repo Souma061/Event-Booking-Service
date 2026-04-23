@@ -12,6 +12,7 @@ from app.routes.auth import router as auth_router
 from app.routes.booking import router as booking_router
 from app.routes.events import router as events_router
 from app.routes.payments import router as payments_router
+from app.routes.admin import router as admin_router
 from app.utils.rate_limit import TokenBucket, get_rate_limit_client_ip, parse_rate_limit
 
 
@@ -71,3 +72,4 @@ app.include_router(auth_router)
 app.include_router(booking_router)
 app.include_router(events_router)
 app.include_router(payments_router)
+app.include_router(admin_router)

@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_BOOKING: str = "5/minute"
     RATE_LIMIT_RECOMMENDATION: str = "20/minute"
 
-    RAZORPAY_KEY_ID: str = ""
-    RAZORPAY_KEY_SECRET: str = ""
-    RAZORPAY_WEBHOOK_SECRET: str = ""
+    CASHFREE_APP_ID: str = ""
+    CASHFREE_SECRET_KEY: str = ""
+    CASHFREE_ENVIRONMENT: str = "SANDBOX"
 
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

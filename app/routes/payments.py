@@ -17,7 +17,7 @@ from app.schemas.payment import (
     PaymentVerificationRequest,
 )
 from app.services.email_services import send_booking_confirmation_email_sync
-from app.services.payment_service import razorpay_service
+from app.services.cashfree_service import cashfree_service
 from app.services.qr_services import build_ticket_payload, generate_qr_base64
 
 
@@ -46,30 +46,34 @@ def create_payment_order(
         .order_by(Payment.id.desc())
     ).scalars().first()
 
-    if existing_payment:
-        amount_in_paise = int(booking.total_amount * 100)
-        return PaymentOrderOut(
-            booking_id=booking.id,
-            provider_order_id=existing_payment.provider_order_id,
-            amount_in_paise=amount_in_paise,
-            currency=booking.currency,
-            razorpay_key_id=settings.RAZORPAY_KEY_ID,
-        )
+    if existing_payment and existing_payment.raw_upload:
+        try:
+            session_id = existing_payment.raw_upload.get("payment_session_id")
+            if session_id:
+                amount_in_paise = int(booking.total_amount * 100)
+                return PaymentOrderOut(
+                    booking_id=booking.id,
+                    provider_order_id=existing_payment.provider_order_id,
+                    amount_in_paise=amount_in_paise,
+                    currency=booking.currency,
+                    payment_session_id=session_id,
+                )
+        except Exception:
+            pass
+
+    order_id = f"order_{booking.id}_{secrets.token_hex(4)}"
 
     try:
-        order = razorpay_service.create_order(
+        cf_order = cashfree_service.create_order(
+            order_id=order_id,
             amount=booking.total_amount,
-            receipt=f"booking_{booking.id}_{secrets.token_hex(8)}",
             currency=booking.currency,
-            notes={"booking_id": str(booking.id), "user_id": str(current_user.id)},
-        )
-    except RuntimeError:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to create payment order with Razorpay",
+            customer_id=f"cust_{current_user.id}",
+            customer_email=current_user.email,
+            customer_phone=current_user.phone
         )
     except Exception as e:
-        print(f"DEBUG: Exception in Razorpay create_order: {repr(e)}")
+        print(f"DEBUG: Exception in Cashfree create_order: {repr(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(
@@ -79,12 +83,12 @@ def create_payment_order(
 
     payment = Payment(
         booking_id=booking.id,
-        provider="RAZORPAY",
-        provider_order_id=order["id"],
+        provider="CASHFREE",
+        provider_order_id=cf_order["order_id"],
         amount=booking.total_amount,
         currency=booking.currency,
         status=PaymentStatus.CREATED,
-        raw_upload=order,
+        raw_upload=cf_order,
     )
     db.add(payment)
     db.commit()
@@ -92,10 +96,10 @@ def create_payment_order(
     amount_in_paise = int(booking.total_amount * 100)
     return PaymentOrderOut(
         booking_id=booking.id,
-        provider_order_id=order["id"],
+        provider_order_id=cf_order["order_id"],
         amount_in_paise=amount_in_paise,
         currency=booking.currency,
-        razorpay_key_id=settings.RAZORPAY_KEY_ID,
+        payment_session_id=cf_order["payment_session_id"],
     )
 
 
@@ -129,30 +133,19 @@ def verify_payment(
         )
 
     try:
-        signature_ok = razorpay_service.verify_signature(
-            order_id=payload.provider_order_id,
-            payment_id=payload.provider_payment_id,
-            signature=payload.provider_signature,
-        )
-    except RuntimeError:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Payment provider is not configured",
-        )
+        cf_order = cashfree_service.get_order(order_id=payload.provider_order_id)
+        order_status = cf_order.get("order_status")
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Payment provider error while verifying payment",
         )
 
-    payment.provider_payment_id = payload.provider_payment_id
-    payment.provider_signature = payload.provider_signature
-
-    if not signature_ok:
+    if order_status != "PAID":
         payment.status = PaymentStatus.FAILED
         booking.status = BookingStatus.FAILED
         db.commit()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payment signature")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Payment not completed. Status: {order_status}")
 
     payment.status = PaymentStatus.CAPTURED
     booking.status = BookingStatus.CONFIRMED

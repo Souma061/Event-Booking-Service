@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard, MapPin, Calendar, Plus, Ticket,
   ChevronDown, ChevronUp, CheckCircle,
-  Trash2, RefreshCw, Users, Tag,
+  Trash2, RefreshCw, Users, Tag, ScanLine, XCircle
 } from 'lucide-react';
 import api from '../lib/api';
 import type { VenueOut, EventOut, ShowOut } from '../types';
@@ -653,6 +653,118 @@ function ShowsSection() {
   );
 }
 
+/* ─── Section: Ticket Scanner ─── */
+function ScannerSection() {
+  const [ticketCode, setTicketCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{
+    status: string;
+    message: string;
+    ticket_id?: number;
+    booking_id?: number;
+  } | null>(null);
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketCode.trim()) return;
+    
+    setLoading(true);
+    setResult(null);
+    try {
+      const { data } = await api.post('/api/admin/verify-ticket', { ticket_code: ticketCode.trim() });
+      setResult(data);
+      if (data.status === 'VALID') {
+        notify('Ticket verified successfully!', 'success');
+      } else {
+        notify(data.message, 'error');
+      }
+    } catch (err) {
+      const errorMsg = apiError(err);
+      setResult({ status: 'ERROR', message: errorMsg });
+      notify(errorMsg, 'error');
+    } finally {
+      setLoading(false);
+      setTicketCode('');
+    }
+  };
+
+  return (
+    <div className="admin-section">
+      <div className="admin-section-header">
+        <div className="admin-section-title">
+          <ScanLine size={18} />
+          <h2>Ticket Scanner</h2>
+        </div>
+      </div>
+
+      <div className="card" style={{ maxWidth: '500px', margin: '0 auto', marginTop: '2rem' }}>
+        <div className="card-body">
+          <p style={{ marginBottom: '1.5rem', color: 'var(--clr-muted)' }}>
+            Enter the unique ticket code (from the QR) to verify and mark the ticket as used.
+          </p>
+          
+          <form onSubmit={handleVerify} className="admin-form">
+            <div className="form-group">
+              <label className="form-label" htmlFor="ticket-code-input">Ticket Code</label>
+              <input 
+                id="ticket-code-input"
+                className="form-input" 
+                placeholder="e.g. TKT-10-ABCD..." 
+                value={ticketCode}
+                onChange={e => setTicketCode(e.target.value)}
+                required
+                autoFocus
+                style={{ fontSize: '1.2rem', padding: '1rem', textAlign: 'center' }}
+              />
+            </div>
+            
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
+              disabled={loading}
+            >
+              {loading ? <><span className="spinner" /> Verifying...</> : <><ScanLine size={18} /> Verify Ticket</>}
+            </button>
+          </form>
+
+          {result && (
+            <div style={{
+              marginTop: '2rem', 
+              padding: '1.5rem',
+              borderRadius: 'var(--radius)',
+              background: result.status === 'VALID' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
+              border: `1px solid ${result.status === 'VALID' ? 'var(--clr-emerald)' : 'var(--clr-rose)'}`,
+              textAlign: 'center'
+            }}>
+              {result.status === 'VALID' ? (
+                <CheckCircle size={48} color="var(--clr-emerald)" style={{ margin: '0 auto 1rem' }} />
+              ) : (
+                <XCircle size={48} color="var(--clr-rose)" style={{ margin: '0 auto 1rem' }} />
+              )}
+              
+              <h3 style={{ 
+                color: result.status === 'VALID' ? 'var(--clr-emerald)' : 'var(--clr-rose)',
+                marginBottom: '0.5rem',
+                fontSize: '1.5rem'
+              }}>
+                {result.status === 'VALID' ? 'Entry Approved!' : 'Entry Denied!'}
+              </h3>
+              
+              <p style={{ fontWeight: '500', marginBottom: '1rem' }}>{result.message}</p>
+              
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', fontSize: '0.9rem', color: 'var(--clr-muted)' }}>
+                {result.ticket_id && <span>Ticket #{result.ticket_id}</span>}
+                {result.booking_id && <span>Booking #{result.booking_id}</span>}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Stat Card ─── */
 function StatCard({ icon: Icon, label, value, color }: {
   icon: React.ElementType; label: string; value: string | number; color: string;
@@ -673,7 +785,7 @@ function StatCard({ icon: Icon, label, value, color }: {
 }
 
 /* ─── Main Admin Page ─── */
-type Tab = 'venues' | 'events' | 'shows';
+type Tab = 'venues' | 'events' | 'shows' | 'scanner';
 
 export default function Admin() {
   const [tab, setTab] = useState<Tab>('events');
@@ -727,6 +839,7 @@ export default function Admin() {
             { id: 'events', icon: Calendar, label: 'Events' },
             { id: 'venues', icon: MapPin, label: 'Venues' },
             { id: 'shows', icon: Ticket, label: 'Shows & Inventory' },
+            { id: 'scanner', icon: ScanLine, label: 'Verify Tickets' },
           ] as { id: Tab; icon: React.ElementType; label: string }[]).map(t => (
             <button
               key={t.id}
@@ -747,6 +860,7 @@ export default function Admin() {
           {tab === 'events' && <EventsSection />}
           {tab === 'venues' && <VenuesSection />}
           {tab === 'shows' && <ShowsSection />}
+          {tab === 'scanner' && <ScannerSection />}
         </div>
       </div>
     </main>

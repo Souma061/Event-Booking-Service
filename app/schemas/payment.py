@@ -8,14 +8,13 @@ class PaymentOrderOut(BaseModel):
     provider_order_id: str
     amount_in_paise: int
     currency: str
-    razorpay_key_id: str
+    payment_session_id: str
 
 
 class PaymentVerificationRequest(BaseModel):
     booking_id: int
     provider_order_id: str
-    provider_payment_id: str
-    provider_signature: str
+
 
 class PaymentVerificationOut(BaseModel):
     booking_id: int

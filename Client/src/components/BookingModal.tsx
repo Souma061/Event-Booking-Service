@@ -82,53 +82,42 @@ export default function BookingModal({ show, availability, eventTitle, onClose }
         booking_id: booking.id
       });
 
-      const scriptLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
+      const scriptLoaded = await loadScript('https://sdk.cashfree.com/js/v3/cashfree.js');
       if (!scriptLoaded) {
         setError('Payment gateway failed to load. Please check your connection.');
         setLoading(false);
         return;
       }
 
-      const options = {
-        key: paymentOrder.razorpay_key_id,
-        amount: paymentOrder.amount_in_paise,
-        currency: paymentOrder.currency,
-        name: eventTitle,
-        description: 'Ticket Booking',
-        order_id: paymentOrder.provider_order_id,
-        handler: async function (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string; }) {
-          try {
-            await api.post('/api/payments/verify', {
-              booking_id: paymentOrder.booking_id,
-              provider_order_id: response.razorpay_order_id,
-              provider_payment_id: response.razorpay_payment_id,
-              provider_signature: response.razorpay_signature,
-            });
-            setSuccess(true);
-            setTimeout(onClose, 2000);
-          } catch (verifyErr: unknown) {
-            const msg = (verifyErr as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            setError(msg || 'Payment verification failed.');
-            setLoading(false);
-          }
-        },
-        theme: {
-          color: '#4b2d8b'
-        },
-        modal: {
-          ondismiss: function () {
-            setLoading(false);
-          }
-        }
-      };
-
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const razorpay = new (window as any).Razorpay(options);
-      razorpay.on('payment.failed', function (response: { error: { description: string } }) {
-        setError(response.error.description || 'Payment failed.');
-        setLoading(false);
+      const cashfree = (window as any).Cashfree({ mode: "sandbox" });
+      
+      const checkoutOptions = {
+          paymentSessionId: paymentOrder.payment_session_id,
+          redirectTarget: "_modal",
+      };
+      
+      cashfree.checkout(checkoutOptions).then(async (result: any) => {
+          if (result.error) {
+              setError(result.error.message || "Payment failed or cancelled.");
+              setLoading(false);
+          }
+          if (result.paymentDetails) {
+              try {
+                  await api.post('/api/payments/verify', {
+                      booking_id: paymentOrder.booking_id,
+                      provider_order_id: paymentOrder.provider_order_id,
+                  });
+                  setSuccess(true);
+                  setTimeout(onClose, 2000);
+              } catch (verifyErr: unknown) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const msg = (verifyErr as any)?.response?.data?.detail;
+                  setError(msg || 'Payment verification failed.');
+                  setLoading(false);
+              }
+          }
       });
-      razorpay.open();
 
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;

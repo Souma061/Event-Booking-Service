@@ -117,7 +117,7 @@ export interface PaymentOrderOut {
   provider_order_id: string;
   amount_in_paise: number;
   currency: string;
-  razorpay_key_id: string;
+  payment_session_id: string;
 }
 
 export interface PaymentVerificationRequest {
