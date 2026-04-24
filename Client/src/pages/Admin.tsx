@@ -377,7 +377,14 @@ function ShowsSection() {
   const [savingInv, setSavingInv] = useState(false);
 
   // Show creation form
-  const [showForm, setShowForm] = useState({ start_at: '', end_at: '', status: 'ACTIVE' });
+  const [showForm, setShowForm] = useState({
+    start_at: '',
+    end_at: '',
+    status: 'ACTIVE',
+    category: '',
+    price: '',
+    total_seats: '',
+  });
   const [showFormOpen, setShowFormOpen] = useState(false);
 
   // Inventory rows per show
@@ -423,6 +430,15 @@ function ShowsSection() {
   const handleCreateShow = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEvent || !showForm.start_at || !showForm.end_at) return;
+
+    const normalizedCategory = showForm.category.trim();
+    const hasQuickInventoryInput = Boolean(normalizedCategory || showForm.price || showForm.total_seats);
+    const hasCompleteQuickInventoryInput = Boolean(normalizedCategory && showForm.price && showForm.total_seats);
+    if (hasQuickInventoryInput && !hasCompleteQuickInventoryInput) {
+      notify('To add ticket pricing now, fill category, price and total seats together.', 'error');
+      return;
+    }
+
     setSavingShow(true);
     try {
       const { data } = await api.post<ShowOut>(`/api/events/${selectedEvent}/shows`, {
@@ -431,9 +447,33 @@ function ShowsSection() {
         status: showForm.status,
       });
       setShows(s => [...s, data]);
-      setShowForm({ start_at: '', end_at: '', status: 'ACTIVE' });
+
+      if (hasCompleteQuickInventoryInput) {
+        const { data: savedRows } = await api.put(`/api/events/shows/${data.id}/inventory`, [
+          {
+            category: normalizedCategory,
+            price: parseFloat(showForm.price),
+            total_seats: parseInt(showForm.total_seats),
+          },
+        ]);
+        setSavedInv(prev => ({ ...prev, [data.id]: savedRows }));
+      }
+
+      setShowForm({
+        start_at: '',
+        end_at: '',
+        status: 'ACTIVE',
+        category: '',
+        price: '',
+        total_seats: '',
+      });
       setShowFormOpen(false);
-      notify('Show created successfully', 'success');
+      notify(
+        hasCompleteQuickInventoryInput
+          ? 'Show created with ticket pricing successfully'
+          : 'Show created successfully',
+        'success'
+      );
     } catch (err) {
       notify(apiError(err), 'error');
     } finally {
@@ -552,7 +592,43 @@ function ShowsSection() {
                       <option value="CANCELLED">CANCELLED</option>
                     </select>
                   </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="show-default-category">Ticket Category <span className="form-optional">(optional)</span></label>
+                    <input
+                      id="show-default-category"
+                      className="form-input"
+                      placeholder="e.g. Regular"
+                      value={showForm.category}
+                      onChange={e => setShowForm(f => ({ ...f, category: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="show-default-price">Ticket Price (₹) <span className="form-optional">(optional)</span></label>
+                    <input
+                      id="show-default-price"
+                      type="number"
+                      className="form-input"
+                      placeholder="999"
+                      min="1"
+                      value={showForm.price}
+                      onChange={e => setShowForm(f => ({ ...f, price: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="show-default-seats">Total Seats <span className="form-optional">(optional)</span></label>
+                    <input
+                      id="show-default-seats"
+                      type="number"
+                      className="form-input"
+                      placeholder="500"
+                      min="1"
+                      max="50000"
+                      value={showForm.total_seats}
+                      onChange={e => setShowForm(f => ({ ...f, total_seats: e.target.value }))}
+                    />
+                  </div>
                 </div>
+                <p className="admin-muted">If you enter category, price and seats here, inventory is created automatically with the show.</p>
                 <div className="admin-form-footer">
                   <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowFormOpen(false)}>Cancel</button>
                   <button type="submit" className="btn btn-primary btn-sm" disabled={savingShow} id="create-show-submit">
