@@ -19,11 +19,11 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to={adminOnly ? '/admin/login' : '/login'} state={{ from: location }} replace />;
   }
 
   if (adminOnly && !isAdmin) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

@@ -21,6 +21,32 @@ def _get_login_rate_limit_key(request: Request, email: str) -> str:
     return f"{client_ip}:{email.lower()}"
 
 
+def _authenticate_user(payload: LoginRequest, request: Request, db: Session) -> User:
+    # Limit attempts per IP + email pair to slow down brute-force login abuse.
+    rate_limit_key = _get_login_rate_limit_key(request, payload.email)
+    bucket = login_buckets[rate_limit_key]
+    if not bucket.allow():
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again later.",
+            headers={"Retry-After": str(bucket.retry_after_seconds())},
+        )
+
+    user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive")
+
+    return user
+
+
+def _token_for_user(user: User) -> TokenResponse:
+    token = create_access_token(str(user.id))
+    return TokenResponse(access_token=token, token_type="bearer")
+
+
 @router.post("/register", response_model=Userout, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     existing_user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
@@ -54,22 +80,16 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    # Limit attempts per IP + email pair to slow down brute-force login abuse.
-    rate_limit_key = _get_login_rate_limit_key(request, payload.email)
-    bucket = login_buckets[rate_limit_key]
-    if not bucket.allow():
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many login attempts. Please try again later.",
-            headers={"Retry-After": str(bucket.retry_after_seconds())},
-        )
+    user = _authenticate_user(payload, request, db)
+    return _token_for_user(user)
 
-    user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
-    token = create_access_token(str(user.id))
-    return TokenResponse(access_token=token, token_type="bearer")
+@router.post("/admin/login", response_model=TokenResponse)
+def admin_login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    user = _authenticate_user(payload, request, db)
+    if user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
+    return _token_for_user(user)
 
 
 @router.get("/me", response_model=Userout)

@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, Ticket, AlertCircle, Shield } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { AlertCircle, Eye, EyeOff, Lock, Mail, Shield, Ticket } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/useAuth';
 import type { TokenResponse } from '../types';
 import './Auth.css';
 
-export default function Login() {
+export default function AdminLogin() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/events';
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/admin';
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPass, setShowPass] = useState(false);
@@ -29,15 +29,16 @@ export default function Login() {
       setError('Please fill in all fields.');
       return;
     }
+
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post<TokenResponse>('/api/auth/login', form);
+      const { data } = await api.post<TokenResponse>('/api/auth/admin/login', form);
       await login(data.access_token);
       navigate(from, { replace: true });
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg || 'Invalid email or password.');
+      setError(msg || 'Admin sign in failed.');
     } finally {
       setLoading(false);
     }
@@ -47,7 +48,6 @@ export default function Login() {
     <main className="auth-page page-enter" id="main-content">
       <div className="auth-glow" aria-hidden="true" />
       <div className="auth-container">
-        {/* Brand */}
         <div className="auth-brand">
           <div className="auth-logo"><Ticket size={20} /></div>
           <span className="auth-logo-text">Event<strong>Vault</strong></span>
@@ -56,8 +56,11 @@ export default function Login() {
         <div className="auth-card card">
           <div className="card-body auth-card-body">
             <div className="auth-header">
-              <h1>Welcome back</h1>
-              <p>Sign in to your account to continue</p>
+              <div className="auth-role-icon" aria-hidden="true">
+                <Shield size={22} />
+              </div>
+              <h1>Admin sign in</h1>
+              <p>Use an administrator account to access the control panel</p>
             </div>
 
             {error && (
@@ -69,15 +72,15 @@ export default function Login() {
 
             <form onSubmit={handleSubmit} className="auth-form" noValidate>
               <div className="form-group">
-                <label className="form-label" htmlFor="login-email">Email address</label>
+                <label className="form-label" htmlFor="admin-email">Email address</label>
                 <div className="input-wrap">
                   <Mail size={16} className="input-icon" aria-hidden="true" />
                   <input
-                    id="login-email"
+                    id="admin-email"
                     name="email"
                     type="email"
                     className="form-input with-icon"
-                    placeholder="you@example.com"
+                    placeholder="admin@example.com"
                     value={form.email}
                     onChange={handleChange}
                     autoComplete="email"
@@ -87,15 +90,15 @@ export default function Login() {
               </div>
 
               <div className="form-group">
-                <label className="form-label" htmlFor="login-password">Password</label>
+                <label className="form-label" htmlFor="admin-password">Password</label>
                 <div className="input-wrap">
                   <Lock size={16} className="input-icon" aria-hidden="true" />
                   <input
-                    id="login-password"
+                    id="admin-password"
                     name="password"
                     type={showPass ? 'text' : 'password'}
                     className="form-input with-icon with-suffix"
-                    placeholder="••••••••"
+                    placeholder="Admin password"
                     value={form.password}
                     onChange={handleChange}
                     autoComplete="current-password"
@@ -106,7 +109,7 @@ export default function Login() {
                     className="input-suffix-btn"
                     onClick={() => setShowPass(!showPass)}
                     aria-label={showPass ? 'Hide password' : 'Show password'}
-                    id="toggle-password-visibility"
+                    id="admin-toggle-password-visibility"
                   >
                     {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -117,20 +120,15 @@ export default function Login() {
                 type="submit"
                 className="btn btn-primary btn-full btn-lg"
                 disabled={loading}
-                id="login-submit-btn"
+                id="admin-login-submit-btn"
               >
-                {loading ? <><span className="spinner" />Signing in…</> : 'Sign In'}
+                {loading ? <><span className="spinner" />Signing in...</> : 'Sign In as Admin'}
               </button>
             </form>
 
             <p className="auth-switch">
-              Don't have an account?{' '}
-              <Link to="/register" className="auth-link">Create one</Link>
-            </p>
-            <p className="auth-switch">
-              <Shield size={13} className="auth-inline-icon" aria-hidden="true" />
-              Admin user?{' '}
-              <Link to="/admin/login" className="auth-link">Sign in as admin</Link>
+              Customer account?{' '}
+              <Link to="/login" className="auth-link">Use normal sign in</Link>
             </p>
           </div>
         </div>
