@@ -12,8 +12,12 @@ class Settings(BaseSettings):
     APP_NAME: str = "Event Booking Service"
     APP_ENV: str = "dev"
     API_PREFIX: str = "/api"
-    CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
-    CORS_ALLOW_ORIGIN_REGEX: str = ""
+    CORS_ALLOW_ORIGINS: str = (
+        "https://event-booking-service.vercel.app,"
+        "http://localhost:5173,"
+        "http://127.0.0.1:5173"
+    )
+    CORS_ALLOW_ORIGIN_REGEX: str = r"https://event-booking-service(-[a-z0-9-]+)?\.vercel\.app"
 
     DATABASE_URL: str = Field(
         default="postgresql+psycopg2://postgres:postgres@localhost:5432/event_booking"

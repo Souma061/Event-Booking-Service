@@ -1,4 +1,5 @@
 from collections import defaultdict
+import json
 import logging
 
 from fastapi import FastAPI, Request
@@ -22,9 +23,26 @@ _ = models
 
 
 def _parse_cors_allow_origins(raw_origins: str) -> list[str]:
+    raw_origins = raw_origins.strip()
+    if not raw_origins:
+        return []
+
+    candidates: list[str]
+    try:
+        parsed_json = json.loads(raw_origins)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        parsed_json = None
+
+    if isinstance(parsed_json, str):
+        candidates = [parsed_json]
+    elif isinstance(parsed_json, list):
+        candidates = [str(origin) for origin in parsed_json]
+    else:
+        candidates = raw_origins.replace("\n", ",").split(",")
+
     parsed: list[str] = []
-    for origin in raw_origins.replace("\n", ",").split(","):
-        normalized = origin.strip().rstrip("/")
+    for origin in candidates:
+        normalized = origin.strip().strip('"').strip("'").rstrip("/")
         if normalized:
             parsed.append(normalized)
     return parsed
@@ -35,6 +53,12 @@ cors_allow_origin_regex = settings.CORS_ALLOW_ORIGIN_REGEX.strip() or None
 
 if not cors_allow_origins and not cors_allow_origin_regex:
     logger.warning("CORS is enabled but no allowed origins are configured")
+
+logger.info(
+    "CORS configured with %d origin(s), regex=%s",
+    len(cors_allow_origins),
+    cors_allow_origin_regex or "<none>",
+)
 
 default_capacity, default_refill_rate = parse_rate_limit(settings.RATE_LIMIT_DEFAULT)
 default_buckets = defaultdict(
