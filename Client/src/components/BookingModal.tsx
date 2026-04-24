@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
-import { X, Ticket, Plus, Minus, ShoppingCart, AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Minus, Plus, ShoppingCart, Ticket, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import api from '../lib/api';
-import type { ShowOut, ShowAvailabilityOut, InventoryRowOut, BookingOut, PaymentOrderOut } from '../types';
+import type { BookingOut, InventoryRowOut, PaymentOrderOut, ShowAvailabilityOut, ShowOut } from '../types';
 import './BookingModal.css';
 
 function loadScript(src: string): Promise<boolean> {
@@ -92,8 +92,14 @@ export default function BookingModal({ show, availability, eventTitle, onClose }
 
   const total = useMemo(() => cart.reduce((sum, i) => sum + i.quantity * i.price, 0), [cart]);
   const itemsToBook = useMemo(() => cart.filter(i => i.quantity > 0), [cart]);
+  const hasInventory = Boolean(availability && availability.inventory.length > 0);
 
   const handleBook = async () => {
+    if (!hasInventory) {
+      setError('This show is not configured for booking yet. Please try another show or contact the organizer.');
+      return;
+    }
+
     if (itemsToBook.length === 0) {
       setError('Please select at least one ticket.');
       return;
@@ -129,29 +135,29 @@ export default function BookingModal({ show, availability, eventTitle, onClose }
       const cashfree = cashfreeFactory({ mode: 'production' });
 
       const checkoutOptions = {
-          paymentSessionId: paymentOrder.payment_session_id,
-          redirectTarget: '_modal',
+        paymentSessionId: paymentOrder.payment_session_id,
+        redirectTarget: '_modal',
       } as const;
 
       cashfree.checkout(checkoutOptions).then(async (result) => {
-          if (result.error) {
-              setError(result.error.message || 'Payment failed or cancelled.');
-              setLoading(false);
+        if (result.error) {
+          setError(result.error.message || 'Payment failed or cancelled.');
+          setLoading(false);
+        }
+        if (result.paymentDetails) {
+          try {
+            await api.post('/api/payments/verify', {
+              booking_id: paymentOrder.booking_id,
+              provider_order_id: paymentOrder.provider_order_id,
+            });
+            setSuccess(true);
+            setTimeout(onClose, 2000);
+          } catch (verifyErr: unknown) {
+            const msg = getApiErrorDetail(verifyErr);
+            setError(msg || 'Payment verification failed.');
+            setLoading(false);
           }
-          if (result.paymentDetails) {
-              try {
-                  await api.post('/api/payments/verify', {
-                      booking_id: paymentOrder.booking_id,
-                      provider_order_id: paymentOrder.provider_order_id,
-                  });
-                  setSuccess(true);
-                  setTimeout(onClose, 2000);
-              } catch (verifyErr: unknown) {
-                  const msg = getApiErrorDetail(verifyErr);
-                  setError(msg || 'Payment verification failed.');
-                  setLoading(false);
-              }
-          }
+        }
       });
 
     } catch (err: unknown) {
@@ -194,6 +200,12 @@ export default function BookingModal({ show, availability, eventTitle, onClose }
             <div className="modal-no-avail">
               <AlertCircle size={32} />
               <p>Availability data unavailable. Please try again.</p>
+            </div>
+          ) : !hasInventory ? (
+            <div className="modal-no-avail">
+              <AlertCircle size={32} />
+              <p>No ticket categories are configured for this show yet.</p>
+              <p className="modal-subtitle">Admin needs to add category, price, and seats in Shows &amp; Inventory.</p>
             </div>
           ) : (
             <>
@@ -262,7 +274,7 @@ export default function BookingModal({ show, availability, eventTitle, onClose }
         </div>
 
         {/* Footer */}
-        {!success && availability && (
+        {!success && availability && hasInventory && (
           <div className="modal-footer">
             <button className="btn btn-ghost" onClick={onClose} id="booking-cancel-btn">Cancel</button>
             <button
