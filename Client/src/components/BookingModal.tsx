@@ -28,10 +28,40 @@ interface CartItem {
   available: number;
 }
 
+interface ApiErrorResponse {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+}
+
+interface CashfreeCheckoutResult {
+  error?: {
+    message?: string;
+  };
+  paymentDetails?: unknown;
+}
+
+interface CashfreeInstance {
+  checkout: (options: {
+    paymentSessionId: string;
+    redirectTarget: '_modal';
+  }) => Promise<CashfreeCheckoutResult>;
+}
+
+interface CashfreeWindow extends Window {
+  Cashfree?: (options: { mode: 'sandbox' | 'production' }) => CashfreeInstance;
+}
+
 function buildIdempotencyKey(): string {
   return typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getApiErrorDetail(err: unknown): string | undefined {
+  return (err as ApiErrorResponse)?.response?.data?.detail;
 }
 
 function initCart(inv: InventoryRowOut[]): CartItem[] {
@@ -89,17 +119,23 @@ export default function BookingModal({ show, availability, eventTitle, onClose }
         return;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cashfree = (window as any).Cashfree({ mode: "sandbox" });
-      
+      const cashfreeFactory = (window as CashfreeWindow).Cashfree;
+      if (!cashfreeFactory) {
+        setError('Payment gateway is unavailable. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      const cashfree = cashfreeFactory({ mode: 'production' });
+
       const checkoutOptions = {
           paymentSessionId: paymentOrder.payment_session_id,
-          redirectTarget: "_modal",
-      };
-      
-      cashfree.checkout(checkoutOptions).then(async (result: any) => {
+          redirectTarget: '_modal',
+      } as const;
+
+      cashfree.checkout(checkoutOptions).then(async (result) => {
           if (result.error) {
-              setError(result.error.message || "Payment failed or cancelled.");
+              setError(result.error.message || 'Payment failed or cancelled.');
               setLoading(false);
           }
           if (result.paymentDetails) {
@@ -111,8 +147,7 @@ export default function BookingModal({ show, availability, eventTitle, onClose }
                   setSuccess(true);
                   setTimeout(onClose, 2000);
               } catch (verifyErr: unknown) {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const msg = (verifyErr as any)?.response?.data?.detail;
+                  const msg = getApiErrorDetail(verifyErr);
                   setError(msg || 'Payment verification failed.');
                   setLoading(false);
               }
@@ -120,7 +155,7 @@ export default function BookingModal({ show, availability, eventTitle, onClose }
       });
 
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      const msg = getApiErrorDetail(err);
       setError(msg || 'Booking failed. Please try again.');
       setLoading(false);
     }

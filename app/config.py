@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Event Booking Service"
     APP_ENV: str = "dev"
     API_PREFIX: str = "/api"
+    CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     DATABASE_URL: str = Field(
         default="postgresql+psycopg2://postgres:postgres@localhost:5432/event_booking"
@@ -30,6 +31,8 @@ class Settings(BaseSettings):
     CASHFREE_APP_ID: str = ""
     CASHFREE_SECRET_KEY: str = ""
     CASHFREE_ENVIRONMENT: str = "SANDBOX"
+    CASHFREE_WEBHOOK_URL: str = ""
+    CASHFREE_WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS: int = 300
 
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

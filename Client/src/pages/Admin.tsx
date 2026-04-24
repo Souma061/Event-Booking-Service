@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard, MapPin, Calendar, Plus, Ticket,
   ChevronDown, ChevronUp, CheckCircle,
-  Trash2, RefreshCw, Users, Tag, ScanLine, XCircle
+  Trash2, RefreshCw, Users, Tag, X
 } from 'lucide-react';
 import api from '../lib/api';
 import type { VenueOut, EventOut, ShowOut } from '../types';
@@ -692,7 +692,7 @@ function ScannerSection() {
     <div className="admin-section">
       <div className="admin-section-header">
         <div className="admin-section-title">
-          <ScanLine size={18} />
+          <CheckCircle size={18} />
           <h2>Ticket Scanner</h2>
         </div>
       </div>
@@ -724,7 +724,7 @@ function ScannerSection() {
               style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
               disabled={loading}
             >
-              {loading ? <><span className="spinner" /> Verifying...</> : <><ScanLine size={18} /> Verify Ticket</>}
+              {loading ? <><span className="spinner" /> Verifying...</> : <><CheckCircle size={18} /> Verify Ticket</>}
             </button>
           </form>
 
@@ -740,7 +740,7 @@ function ScannerSection() {
               {result.status === 'VALID' ? (
                 <CheckCircle size={48} color="var(--clr-emerald)" style={{ margin: '0 auto 1rem' }} />
               ) : (
-                <XCircle size={48} color="var(--clr-rose)" style={{ margin: '0 auto 1rem' }} />
+                <X size={48} color="var(--clr-rose)" style={{ margin: '0 auto 1rem' }} />
               )}
               
               <h3 style={{ 
@@ -839,7 +839,7 @@ export default function Admin() {
             { id: 'events', icon: Calendar, label: 'Events' },
             { id: 'venues', icon: MapPin, label: 'Venues' },
             { id: 'shows', icon: Ticket, label: 'Shows & Inventory' },
-            { id: 'scanner', icon: ScanLine, label: 'Verify Tickets' },
+            { id: 'scanner', icon: CheckCircle, label: 'Verify Tickets' },
           ] as { id: Tab; icon: React.ElementType; label: string }[]).map(t => (
             <button
               key={t.id}

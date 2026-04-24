@@ -14,6 +14,7 @@ class BookingCreateRequest(BaseModel):
 
 
 class BookingItemOut(BaseModel):
+    id: int
     category: str
     quantity: int
     unit_price: Decimal

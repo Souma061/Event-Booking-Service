@@ -42,7 +42,7 @@ export interface EventOut {
   venue_id: number;
   venue?: VenueOut;
   created_at: string;
-  created_by: number;
+  created_by_user_id: number;
 }
 
 export interface ShowOut {
@@ -123,8 +123,6 @@ export interface PaymentOrderOut {
 export interface PaymentVerificationRequest {
   booking_id: number;
   provider_order_id: string;
-  provider_payment_id: string;
-  provider_signature: string;
 }
 
 export interface PaymentVerificationOut {

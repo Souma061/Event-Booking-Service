@@ -17,12 +17,24 @@ from app.utils.rate_limit import TokenBucket, get_rate_limit_client_ip, parse_ra
 
 
 _ = models
+cors_allow_origins = [
+    origin.strip()
+    for origin in settings.CORS_ALLOW_ORIGINS.split(",")
+    if origin.strip()
+]
 
 default_capacity, default_refill_rate = parse_rate_limit(settings.RATE_LIMIT_DEFAULT)
 default_buckets = defaultdict(
     lambda: TokenBucket(capacity=default_capacity, refill_rate=default_refill_rate)
 )
-rate_limit_exempt_paths = {"/", "/health", "/docs", "/openapi.json", "/redoc"}
+rate_limit_exempt_paths = {
+    "/",
+    "/health",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/api/payments/cashfree/webhook",
+}
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -45,7 +57,7 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=apply_default_rate_limit)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_allow_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
