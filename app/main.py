@@ -22,6 +22,7 @@ cors_allow_origins = [
     for origin in settings.CORS_ALLOW_ORIGINS.split(",")
     if origin.strip()
 ]
+cors_allow_origin_regex = settings.CORS_ALLOW_ORIGIN_REGEX.strip() or None
 
 default_capacity, default_refill_rate = parse_rate_limit(settings.RATE_LIMIT_DEFAULT)
 default_buckets = defaultdict(
@@ -58,6 +59,7 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=apply_default_rate_limit)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_allow_origins,
+    allow_origin_regex=cors_allow_origin_regex,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

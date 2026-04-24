@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     APP_ENV: str = "dev"
     API_PREFIX: str = "/api"
     CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
+    CORS_ALLOW_ORIGIN_REGEX: str = ""
 
     DATABASE_URL: str = Field(
         default="postgresql+psycopg2://postgres:postgres@localhost:5432/event_booking"
