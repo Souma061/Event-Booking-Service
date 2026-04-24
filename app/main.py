@@ -1,4 +1,5 @@
 from collections import defaultdict
+import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,13 +17,24 @@ from app.routes.admin import router as admin_router
 from app.utils.rate_limit import TokenBucket, get_rate_limit_client_ip, parse_rate_limit
 
 
+logger = logging.getLogger(__name__)
 _ = models
-cors_allow_origins = [
-    origin.strip()
-    for origin in settings.CORS_ALLOW_ORIGINS.split(",")
-    if origin.strip()
-]
+
+
+def _parse_cors_allow_origins(raw_origins: str) -> list[str]:
+    parsed: list[str] = []
+    for origin in raw_origins.replace("\n", ",").split(","):
+        normalized = origin.strip().rstrip("/")
+        if normalized:
+            parsed.append(normalized)
+    return parsed
+
+
+cors_allow_origins = _parse_cors_allow_origins(settings.CORS_ALLOW_ORIGINS)
 cors_allow_origin_regex = settings.CORS_ALLOW_ORIGIN_REGEX.strip() or None
+
+if not cors_allow_origins and not cors_allow_origin_regex:
+    logger.warning("CORS is enabled but no allowed origins are configured")
 
 default_capacity, default_refill_rate = parse_rate_limit(settings.RATE_LIMIT_DEFAULT)
 default_buckets = defaultdict(
@@ -42,7 +54,7 @@ app = FastAPI(title=settings.APP_NAME)
 async def apply_default_rate_limit(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
-        
+
     if request.url.path not in rate_limit_exempt_paths:
         bucket = default_buckets[get_rate_limit_client_ip(request)]
         if not bucket.allow():
