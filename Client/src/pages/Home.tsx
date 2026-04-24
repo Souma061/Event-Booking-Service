@@ -12,8 +12,8 @@ const CATEGORIES = [
 const FEATURES = [
   {
     icon: Zap,
-    title: 'Instant Booking',
-    desc: 'Reserve your seats in seconds with our streamlined checkout powered by Razorpay.',
+    title: 'Fast Checkout',
+    desc: 'Reserve seats in a few steps with live inventory and Cashfree-powered payments.',
   },
   {
     icon: Shield,
@@ -37,21 +37,20 @@ export default function Home() {
     <main className="home page-enter" id="main-content">
       {/* ─── Hero ─── */}
       <section className="hero" aria-label="Hero">
-        <div className="hero-glow" aria-hidden="true" />
         <div className="hero-grid" aria-hidden="true" />
         <div className="container hero-content">
           <div className="hero-badge">
             <Zap size={12} />
-            <span>Live events. Instant booking.</span>
+            <span>Verified shows. Secure checkout.</span>
           </div>
           <h1 className="hero-headline">
-            Book Every<br />
-            <span className="gradient-text">Unforgettable</span><br />
-            Moment
+            Book tickets for<br />
+            <span className="gradient-text">live experiences</span><br />
+            with confidence
           </h1>
           <p className="hero-sub">
-            Discover thousands of concerts, shows, sports events, and more.
-            Secure your seats before they're gone.
+            Discover concerts, comedy, sports, and theatre with real-time seat availability,
+            verified payments, and QR tickets ready for entry.
           </p>
           <div className="hero-actions">
             <Link to="/events" className="btn btn-primary btn-lg" id="hero-explore-btn">
@@ -63,18 +62,18 @@ export default function Home() {
           </div>
           <div className="hero-stats">
             <div className="stat">
-              <span className="stat-num">50K+</span>
-              <span className="stat-label">Events Hosted</span>
+              <span className="stat-num">Live</span>
+              <span className="stat-label">Seat Inventory</span>
             </div>
             <div className="stat-divider" />
             <div className="stat">
-              <span className="stat-num">2M+</span>
-              <span className="stat-label">Happy Attendees</span>
+              <span className="stat-num">QR</span>
+              <span className="stat-label">Ticket Entry</span>
             </div>
             <div className="stat-divider" />
             <div className="stat">
-              <span className="stat-num">500+</span>
-              <span className="stat-label">Cities</span>
+              <span className="stat-num">UPI</span>
+              <span className="stat-label">Cards & Netbanking</span>
             </div>
           </div>
         </div>
@@ -115,7 +114,7 @@ export default function Home() {
         <div className="container">
           <div className="section-header">
             <h2>Why EventVault?</h2>
-            <p>Everything you need for a seamless booking experience</p>
+            <p>A booking flow built around clarity, payment safety, and fast entry</p>
           </div>
           <div className="features-grid">
             {FEATURES.map(({ icon: Icon, title, desc }) => (
@@ -137,10 +136,9 @@ export default function Home() {
       <section className="section-cta" aria-label="Call to action">
         <div className="container">
           <div className="cta-card">
-            <div className="cta-glow" aria-hidden="true" />
             <div className="cta-content">
               <h2>Ready to Experience Live Events?</h2>
-              <p>Join over 2 million users who trust EventVault for their event bookings.</p>
+              <p>Create an account, choose a show, and keep every ticket in one place.</p>
               <div className="cta-actions">
                 <Link to="/register" className="btn btn-primary btn-lg" id="cta-register-btn">
                   Get Started for Free <ArrowRight size={16} />

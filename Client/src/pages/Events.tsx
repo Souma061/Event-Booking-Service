@@ -42,7 +42,7 @@ function EventCard({ event, venue }: { event: EventOut; venue?: VenueOut }) {
           )}
           <div className="event-meta-item">
             <Calendar size={13} />
-            <span>{new Date(event.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+            <span>Listed {new Date(event.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
           </div>
         </div>
         <Link
@@ -105,7 +105,7 @@ export default function Events() {
         );
         setVenues(venueMap);
       } catch {
-        setError('Failed to load events. Make sure the backend is running.');
+        setError('Unable to load events. Check the API URL and backend availability.');
       } finally {
         setLoading(false);
       }
@@ -127,7 +127,7 @@ export default function Events() {
         <div className="container events-header-inner">
           <div>
             <h1>Browse Events</h1>
-            <p>{loading ? 'Loading…' : `${filtered.length} event${filtered.length !== 1 ? 's' : ''} available`}</p>
+            <p>{loading ? 'Loading events...' : `${filtered.length} curated event${filtered.length !== 1 ? 's' : ''} ready to book`}</p>
           </div>
           {/* Search */}
           <div className="events-search-wrap">

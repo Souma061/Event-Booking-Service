@@ -42,7 +42,7 @@
   font-family: var(--font-display);
   font-size: 1.1rem;
   color: var(--clr-text);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .navbar-logo-text strong {

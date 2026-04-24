@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { Calendar, MapPin, Clock, Users, ArrowLeft, Tag, Ticket } from 'lucide-react';
 import api from '../lib/api';
 import type { EventOut, VenueOut, ShowOut, ShowAvailabilityOut } from '../types';
@@ -16,6 +16,7 @@ function formatDateTime(iso: string) {
 
 export default function EventDetail() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
 
   const [event, setEvent] = useState<EventOut | null>(null);
@@ -197,8 +198,13 @@ export default function EventDetail() {
                         }
                       </button>
                     ) : (
-                      <Link to="/login" className="btn btn-secondary btn-sm btn-full" id={`login-to-book-${show.id}`}>
-                        Sign In to Book
+                      <Link
+                        to="/register"
+                        state={{ from: location }}
+                        className="btn btn-secondary btn-sm btn-full"
+                        id={`register-to-book-${show.id}`}
+                      >
+                        Register to Book
                       </Link>
                     )
                   ) : (

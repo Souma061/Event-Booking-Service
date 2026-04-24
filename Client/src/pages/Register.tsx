@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, Phone, Ticket, AlertCircle, CheckCircle, Shield } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/useAuth';
@@ -10,6 +10,8 @@ import './Auth.css';
 export default function Register() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/events';
 
   const [form, setForm] = useState({
     full_name: '',
@@ -65,7 +67,7 @@ export default function Register() {
       });
       setSuccess(true);
       await login(data.access_token);
-      setTimeout(() => navigate('/events'), 1200);
+      setTimeout(() => navigate(from, { replace: true }), 1200);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(msg || 'Registration failed. Please try again.');

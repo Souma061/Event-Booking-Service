@@ -8,24 +8,25 @@
 @import "tailwindcss";
 :root {
   /* Colors */
-  --clr-bg:         #0a0a0f;
-  --clr-bg-2:       #111118;
-  --clr-bg-3:       #1a1a24;
-  --clr-surface:    #16161f;
-  --clr-border:     rgba(255, 255, 255, 0.07);
-  --clr-border-2:   rgba(255, 255, 255, 0.12);
+  --clr-bg:         #080a0f;
+  --clr-bg-2:       #10131b;
+  --clr-bg-3:       #171b26;
+  --clr-surface:    #121722;
+  --clr-surface-2:  #18202d;
+  --clr-border:     rgba(226, 232, 240, 0.08);
+  --clr-border-2:   rgba(226, 232, 240, 0.14);
 
-  --clr-accent:     #7c6fff;
-  --clr-accent-2:   #a78bfa;
-  --clr-accent-glow:rgba(124, 111, 255, 0.25);
+  --clr-accent:     #6366f1;
+  --clr-accent-2:   #22d3ee;
+  --clr-accent-glow:rgba(34, 211, 238, 0.18);
   --clr-gold:       #f59e0b;
   --clr-emerald:    #10b981;
   --clr-rose:       #f43f5e;
   --clr-sky:        #38bdf8;
 
-  --clr-text:       #e2e0f0;
-  --clr-text-2:     #9d9ab8;
-  --clr-text-3:     #5c5a72;
+  --clr-text:       #e5e7eb;
+  --clr-text-2:     #a8b0c0;
+  --clr-text-3:     #687386;
   --clr-white:      #ffffff;
 
   /* Typography */
@@ -43,14 +44,14 @@
 
   /* Border Radius */
   --radius-sm:   6px;
-  --radius-md:   12px;
-  --radius-lg:   18px;
-  --radius-xl:   24px;
+  --radius-md:   8px;
+  --radius-lg:   10px;
+  --radius-xl:   14px;
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-glow:  0 0 40px var(--clr-accent-glow);
-  --shadow-card:  0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.04) inset;
+  --shadow-glow:  0 0 32px var(--clr-accent-glow);
+  --shadow-card:  0 18px 50px rgba(0,0,0,0.28), 0 1px 0 rgba(255,255,255,0.04) inset;
   --shadow-modal: 0 24px 64px rgba(0,0,0,0.7);
 
   /* Transitions */
@@ -74,7 +75,9 @@ html {
 
 body {
   font-family: var(--font-body);
-  background: var(--clr-bg);
+  background:
+    linear-gradient(180deg, rgba(34, 211, 238, 0.04), transparent 360px),
+    var(--clr-bg);
   color: var(--clr-text);
   line-height: 1.6;
   min-height: 100vh;
@@ -109,10 +112,16 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--clr-white);
 }
 
-h1 { font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing: -0.03em; }
-h2 { font-size: clamp(1.5rem, 3vw, 2.25rem); letter-spacing: -0.02em; }
-h3 { font-size: clamp(1.15rem, 2vw, 1.5rem); letter-spacing: -0.01em; }
+h1 { font-size: 3rem; letter-spacing: 0; }
+h2 { font-size: 2rem; letter-spacing: 0; }
+h3 { font-size: 1.35rem; letter-spacing: 0; }
 h4 { font-size: 1.1rem; }
+
+@media (max-width: 640px) {
+  h1 { font-size: 2.25rem; }
+  h2 { font-size: 1.65rem; }
+  h3 { font-size: 1.2rem; }
+}
 
 p {
   color: var(--clr-text-2);
@@ -171,18 +180,18 @@ p {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--clr-accent), #9b91ff);
+  background: linear-gradient(135deg, var(--clr-accent), #2563eb);
   color: var(--clr-white);
-  box-shadow: 0 0 0 0 var(--clr-accent-glow);
+  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.22);
 }
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 30px var(--clr-accent-glow);
+  box-shadow: 0 14px 34px rgba(37, 99, 235, 0.28);
 }
 .btn-primary:active { transform: translateY(0); }
 
 .btn-secondary {
-  background: var(--clr-bg-3);
+  background: var(--clr-surface-2);
   color: var(--clr-text);
   border: 1px solid var(--clr-border-2);
 }
@@ -213,7 +222,7 @@ p {
 .btn-lg {
   padding: 14px 28px;
   font-size: 1rem;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
 }
 
 .btn-sm {
@@ -228,7 +237,7 @@ p {
 .card {
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
   transition: all var(--duration) var(--ease-out);
   overflow: hidden;
@@ -236,8 +245,8 @@ p {
 
 .card:hover {
   border-color: var(--clr-border-2);
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-card), 0 0 20px rgba(124,111,255,0.1);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card), 0 0 18px rgba(34,211,238,0.08);
 }
 
 .card-body {
@@ -277,7 +286,7 @@ p {
 }
 
 .form-input:focus {
-  border-color: var(--clr-accent);
+  border-color: var(--clr-accent-2);
   box-shadow: 0 0 0 3px var(--clr-accent-glow);
   background: var(--clr-bg-3);
 }
@@ -405,7 +414,7 @@ p {
 
 /* ─── Gradient Text ─── */
 .gradient-text {
-  background: linear-gradient(135deg, var(--clr-accent), var(--clr-accent-2), #c4b5fd);
+  background: linear-gradient(135deg, #ffffff, var(--clr-accent-2));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

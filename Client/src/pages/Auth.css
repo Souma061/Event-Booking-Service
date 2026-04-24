@@ -11,14 +11,7 @@
 }
 
 .auth-glow {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 600px;
-  height: 400px;
-  background: radial-gradient(ellipse, rgba(124,111,255,0.12), transparent 70%);
-  pointer-events: none;
+  display: none;
 }
 
 .auth-container {
