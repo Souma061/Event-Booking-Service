@@ -26,6 +26,13 @@ def list_events(db: Session = Depends(get_db)):
     return db.execute(select(Event).order_by(Event.created_at.desc())).scalars().all()
 
 
+@router.get("/categories", response_model=list[str])
+def list_event_categories(db: Session = Depends(get_db)):
+    rows = db.execute(select(Event.category)).scalars().all()
+    categories = sorted({row.strip() for row in rows if row and row.strip()}, key=str.casefold)
+    return categories
+
+
 @router.get("/venues", response_model=list[VenueOut])
 def list_venues(db: Session = Depends(get_db)):
     return db.execute(select(Venue).order_by(Venue.id.desc())).scalars().all()

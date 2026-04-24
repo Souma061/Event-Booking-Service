@@ -1,20 +1,18 @@
+import { Calendar, Filter, MapPin, Search, SlidersHorizontal, Tag } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, MapPin, Calendar, Filter, SlidersHorizontal, Tag } from 'lucide-react';
 import api from '../lib/api';
 import type { EventOut, VenueOut } from '../types';
 import './Events.css';
 
-const CATEGORIES = ['All', 'Music', 'Comedy', 'Sports', 'Theater', 'Technology', 'Food'];
-
 function getEventGradient(category: string | null) {
   const map: Record<string, string> = {
-    music:      'linear-gradient(135deg, #6d28d9, #4f46e5)',
-    comedy:     'linear-gradient(135deg, #059669, #0891b2)',
-    sports:     'linear-gradient(135deg, #b45309, #d97706)',
-    theater:    'linear-gradient(135deg, #be185d, #9d174d)',
+    music: 'linear-gradient(135deg, #6d28d9, #4f46e5)',
+    comedy: 'linear-gradient(135deg, #059669, #0891b2)',
+    sports: 'linear-gradient(135deg, #b45309, #d97706)',
+    theater: 'linear-gradient(135deg, #be185d, #9d174d)',
     technology: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
-    food:       'linear-gradient(135deg, #d97706, #dc2626)',
+    food: 'linear-gradient(135deg, #d97706, #dc2626)',
   };
   return map[(category || '').toLowerCase()] || 'linear-gradient(135deg, #4b5563, #374151)';
 }
@@ -62,6 +60,7 @@ function EventCard({ event, venue }: { event: EventOut; venue?: VenueOut }) {
 export default function Events() {
   const [events, setEvents] = useState<EventOut[]>([]);
   const [venues, setVenues] = useState<Record<number, VenueOut>>({});
+  const [categories, setCategories] = useState<string[]>(['All']);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -72,8 +71,25 @@ export default function Events() {
       setLoading(true);
       setError('');
       try {
-        const { data } = await api.get<EventOut[]>('/api/events');
+        const [eventRes, categoryRes] = await Promise.all([
+          api.get<EventOut[]>('/api/events'),
+          api.get<string[]>('/api/events/categories').catch(() => ({ data: [] as string[] })),
+        ]);
+        const data = eventRes.data;
         setEvents(data);
+
+        const fallbackCategories = Array.from(
+          new Set(data.map(e => e.category?.trim()).filter((category): category is string => Boolean(category)))
+        ).sort((a, b) => a.localeCompare(b));
+        const sourceCategories = categoryRes.data.length > 0 ? categoryRes.data : fallbackCategories;
+        setCategories(['All', ...sourceCategories]);
+        setActiveCategory(prev => {
+          if (prev === 'All') {
+            return prev;
+          }
+          return sourceCategories.some(category => category.toLowerCase() === prev.toLowerCase()) ? prev : 'All';
+        });
+
         // Fetch venues for each unique venue_id
         const venueIds = Array.from(new Set(data.map(e => e.venue_id)));
         const venueMap: Record<number, VenueOut> = {};
@@ -141,7 +157,7 @@ export default function Events() {
               <div className="filter-group-title">
                 <Tag size={13} />Category
               </div>
-              {CATEGORIES.map(cat => (
+              {categories.map(cat => (
                 <button
                   key={cat}
                   className={`filter-btn ${activeCategory === cat ? 'active' : ''}`}

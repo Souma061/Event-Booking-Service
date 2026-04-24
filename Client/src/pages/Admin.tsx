@@ -1,11 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
 import {
-  LayoutDashboard, MapPin, Calendar, Plus, Ticket,
-  ChevronDown, ChevronUp, CheckCircle,
-  Trash2, RefreshCw, Users, Tag, X
+  Calendar,
+  CheckCircle,
+  ChevronDown, ChevronUp,
+  LayoutDashboard, MapPin,
+  Plus,
+  RefreshCw,
+  Tag,
+  Ticket,
+  Trash2,
+  Users,
+  X
 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import api from '../lib/api';
-import type { VenueOut, EventOut, ShowOut } from '../types';
+import type { EventOut, ShowOut, VenueOut } from '../types';
 import './Admin.css';
 
 /* ─── Types ─── */
@@ -168,23 +176,24 @@ function VenuesSection() {
 function EventsSection() {
   const [events, setEvents] = useState<EventOut[]>([]);
   const [venues, setVenues] = useState<VenueOut[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ title: '', description: '', category: '', venue_id: '' });
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
 
-  const CATEGORIES = ['Music', 'Comedy', 'Sports', 'Theater', 'Technology', 'Food', 'Other'];
-
   const load = useCallback(async () => {
     await Promise.resolve(); // break sync execution
     setLoading(true);
     try {
-      const [evRes, vnRes] = await Promise.all([
+      const [evRes, vnRes, catRes] = await Promise.all([
         api.get<EventOut[]>('/api/events'),
         api.get<VenueOut[]>('/api/events/venues').catch(() => ({ data: [] as VenueOut[] })),
+        api.get<string[]>('/api/events/categories').catch(() => ({ data: [] as string[] })),
       ]);
       setEvents(evRes.data);
       setVenues(vnRes.data);
+      setCategories(catRes.data);
     } catch {
       // silently handle
     } finally {
@@ -199,16 +208,23 @@ function EventsSection() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !form.category || !form.venue_id) return;
+    const normalizedCategory = form.category.trim();
+    if (!form.title || !normalizedCategory || !form.venue_id) return;
     setSaving(true);
     try {
       const { data } = await api.post<EventOut>('/api/events', {
         title: form.title,
         description: form.description || null,
-        category: form.category,
+        category: normalizedCategory,
         venue_id: parseInt(form.venue_id),
       });
       setEvents(ev => [data, ...ev]);
+      setCategories(prev => {
+        if (prev.some(c => c.toLowerCase() === normalizedCategory.toLowerCase())) {
+          return prev;
+        }
+        return [...prev, normalizedCategory].sort((a, b) => a.localeCompare(b));
+      });
       setForm({ title: '', description: '', category: '', venue_id: '' });
       setOpen(false);
       notify('Event created successfully', 'success');
@@ -252,19 +268,32 @@ function EventsSection() {
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="event-category">Category</label>
-                <select id="event-category" className="form-input"
-                  value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} required>
-                  <option value="">Select category…</option>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <input
+                  id="event-category"
+                  list="event-category-options"
+                  className="form-input"
+                  placeholder="Type or select category…"
+                  value={form.category}
+                  onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                  required
+                />
+                <datalist id="event-category-options">
+                  {categories.map(c => <option key={c} value={c} />)}
+                </datalist>
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="event-venue">Venue</label>
                 <select id="event-venue" className="form-input"
-                  value={form.venue_id} onChange={e => setForm(f => ({ ...f, venue_id: e.target.value }))} required>
-                  <option value="">Select venue…</option>
+                  value={form.venue_id}
+                  onChange={e => setForm(f => ({ ...f, venue_id: e.target.value }))}
+                  disabled={venues.length === 0}
+                  required>
+                  <option value="">{venues.length === 0 ? 'Create a venue first…' : 'Select venue…'}</option>
                   {venues.map(v => <option key={v.id} value={v.id}>{v.name} — {v.city}</option>)}
                 </select>
+                {venues.length === 0 && (
+                  <p className="admin-muted">No venues found. Create one in the Venues tab first.</p>
+                )}
               </div>
               <div className="form-group admin-span-2">
                 <label className="form-label" htmlFor="event-desc">Description <span className="form-optional">(optional)</span></label>
@@ -667,7 +696,7 @@ function ScannerSection() {
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ticketCode.trim()) return;
-    
+
     setLoading(true);
     setResult(null);
     try {
@@ -702,14 +731,14 @@ function ScannerSection() {
           <p style={{ marginBottom: '1.5rem', color: 'var(--clr-muted)' }}>
             Enter the unique ticket code (from the QR) to verify and mark the ticket as used.
           </p>
-          
+
           <form onSubmit={handleVerify} className="admin-form">
             <div className="form-group">
               <label className="form-label" htmlFor="ticket-code-input">Ticket Code</label>
-              <input 
+              <input
                 id="ticket-code-input"
-                className="form-input" 
-                placeholder="e.g. TKT-10-ABCD..." 
+                className="form-input"
+                placeholder="e.g. TKT-10-ABCD..."
                 value={ticketCode}
                 onChange={e => setTicketCode(e.target.value)}
                 required
@@ -717,10 +746,10 @@ function ScannerSection() {
                 style={{ fontSize: '1.2rem', padding: '1rem', textAlign: 'center' }}
               />
             </div>
-            
-            <button 
-              type="submit" 
-              className="btn btn-primary" 
+
+            <button
+              type="submit"
+              className="btn btn-primary"
               style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
               disabled={loading}
             >
@@ -730,7 +759,7 @@ function ScannerSection() {
 
           {result && (
             <div style={{
-              marginTop: '2rem', 
+              marginTop: '2rem',
               padding: '1.5rem',
               borderRadius: 'var(--radius)',
               background: result.status === 'VALID' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
@@ -742,17 +771,17 @@ function ScannerSection() {
               ) : (
                 <X size={48} color="var(--clr-rose)" style={{ margin: '0 auto 1rem' }} />
               )}
-              
-              <h3 style={{ 
+
+              <h3 style={{
                 color: result.status === 'VALID' ? 'var(--clr-emerald)' : 'var(--clr-rose)',
                 marginBottom: '0.5rem',
                 fontSize: '1.5rem'
               }}>
                 {result.status === 'VALID' ? 'Entry Approved!' : 'Entry Denied!'}
               </h3>
-              
+
               <p style={{ fontWeight: '500', marginBottom: '1rem' }}>{result.message}</p>
-              
+
               <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', fontSize: '0.9rem', color: 'var(--clr-muted)' }}>
                 {result.ticket_id && <span>Ticket #{result.ticket_id}</span>}
                 {result.booking_id && <span>Booking #{result.booking_id}</span>}
