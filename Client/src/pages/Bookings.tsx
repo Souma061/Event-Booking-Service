@@ -1,8 +1,8 @@
+import { Calendar, ChevronRight, Clock, ShoppingBag, Ticket, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Ticket, Calendar, Clock, ChevronRight, ShoppingBag } from 'lucide-react';
 import api from '../lib/api';
-import type { BookingOut, BookingStatus } from '../types';
+import type { BookingOut, BookingStatus, TicketOut } from '../types';
 import './Bookings.css';
 
 function statusBadgeClass(status: BookingStatus) {
@@ -15,7 +15,22 @@ function statusBadgeClass(status: BookingStatus) {
   return map[status] ?? 'badge-sky';
 }
 
-function BookingCard({ booking }: { booking: BookingOut }) {
+interface TicketPreviewSelection {
+  bookingId: number;
+  showId: number;
+  createdAt: string;
+  totalAmount: string;
+  currency: string;
+  ticket: TicketOut;
+}
+
+function BookingCard({
+  booking,
+  onTicketClick,
+}: {
+  booking: BookingOut;
+  onTicketClick: (selection: TicketPreviewSelection) => void;
+}) {
   return (
     <article className="booking-card card" aria-label={`Booking #${booking.id}`}>
       <div className="booking-card-inner card-body">
@@ -56,23 +71,36 @@ function BookingCard({ booking }: { booking: BookingOut }) {
 
         {/* Tickets & QR Codes */}
         {booking.tickets && booking.tickets.length > 0 && (
-          <div className="booking-tickets" style={{ marginTop: '1rem' }}>
-            <div style={{ fontSize: '0.85rem', color: 'var(--clr-text-2)', marginBottom: '0.5rem' }}>Your Tickets</div>
-            <div className="tickets-grid" style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+          <div className="booking-tickets">
+            <div className="booking-tickets-title">Your Tickets</div>
+            <div className="tickets-grid">
               {booking.tickets.map(ticket => (
-                <div key={ticket.id} className="ticket-item" style={{ flex: '0 0 auto', border: '1px solid var(--clr-border)', borderRadius: '8px', padding: '0.5rem', textAlign: 'center', background: 'var(--clr-surface-2)' }}>
-                  <div style={{ fontWeight: '500', fontSize: '0.75rem', marginBottom: '0.5rem', color: 'var(--clr-text)' }}>{ticket.ticket_code}</div>
+                <button
+                  key={ticket.id}
+                  type="button"
+                  className="ticket-item ticket-clickable"
+                  onClick={() => onTicketClick({
+                    bookingId: booking.id,
+                    showId: booking.show_id,
+                    createdAt: booking.created_at,
+                    totalAmount: booking.total_amount,
+                    currency: booking.currency,
+                    ticket,
+                  })}
+                  id={`ticket-preview-${ticket.id}`}
+                >
+                  <div className="ticket-code">{ticket.ticket_code}</div>
                   {ticket.qr_image_base64 && (
-                    <img 
-                      src={`data:image/png;base64,${ticket.qr_image_base64}`} 
-                      alt={`QR Code for ${ticket.ticket_code}`} 
-                      style={{ width: '80px', height: '80px', display: 'block', margin: '0 auto', borderRadius: '4px', background: 'white', padding: '4px' }} 
+                    <img
+                      src={`data:image/png;base64,${ticket.qr_image_base64}`}
+                      alt={`QR Code for ${ticket.ticket_code}`}
+                      className="ticket-qr-thumb"
                     />
                   )}
-                  <div style={{ fontSize: '0.7rem', marginTop: '0.5rem', color: ticket.status === 'ACTIVE' ? 'var(--clr-emerald)' : 'var(--clr-rose)' }}>
+                  <div className={`ticket-status ${ticket.status === 'ACTIVE' ? 'ok' : 'bad'}`}>
                     {ticket.status}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -102,6 +130,7 @@ export default function Bookings() {
   const [bookings, setBookings] = useState<BookingOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedTicket, setSelectedTicket] = useState<TicketPreviewSelection | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -178,12 +207,75 @@ export default function Bookings() {
                 <span>Sorted by most recent</span>
               </div>
               <div className="bookings-grid">
-                {bookings.map(b => <BookingCard key={b.id} booking={b} />)}
+                {bookings.map(b => (
+                  <BookingCard
+                    key={b.id}
+                    booking={b}
+                    onTicketClick={setSelectedTicket}
+                  />
+                ))}
               </div>
             </div>
           </>
         )}
       </div>
+
+      {selectedTicket && (
+        <div
+          className="ticket-modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setSelectedTicket(null);
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Ticket preview"
+        >
+          <div className="ticket-modal card">
+            <div className="ticket-modal-header">
+              <div>
+                <h3>Ticket Preview</h3>
+                <p>{selectedTicket.ticket.ticket_code}</p>
+              </div>
+              <button
+                className="ticket-modal-close"
+                onClick={() => setSelectedTicket(null)}
+                aria-label="Close ticket preview"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="ticket-modal-body">
+              {selectedTicket.ticket.qr_image_base64 ? (
+                <img
+                  src={`data:image/png;base64,${selectedTicket.ticket.qr_image_base64}`}
+                  alt={`Ticket QR for ${selectedTicket.ticket.ticket_code}`}
+                  className="ticket-modal-qr"
+                />
+              ) : (
+                <div className="ticket-modal-noqr">QR image not available</div>
+              )}
+
+              <div className="ticket-modal-meta">
+                <div><span>Booking</span><strong>#{selectedTicket.bookingId}</strong></div>
+                <div><span>Show</span><strong>#{selectedTicket.showId}</strong></div>
+                <div><span>Status</span><strong>{selectedTicket.ticket.status}</strong></div>
+                <div>
+                  <span>Booked At</span>
+                  <strong>
+                    {new Date(selectedTicket.createdAt).toLocaleString('en-IN', {
+                      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                    })}
+                  </strong>
+                </div>
+                <div><span>Total</span><strong>{selectedTicket.currency} {parseFloat(selectedTicket.totalAmount).toLocaleString('en-IN')}</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -1,17 +1,20 @@
 import {
   Calendar,
+  Camera,
+  CameraOff,
   CheckCircle,
   ChevronDown, ChevronUp,
   LayoutDashboard, MapPin,
   Plus,
   RefreshCw,
+  ScanLine,
   Tag,
   Ticket,
   Trash2,
   Users,
   X
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../lib/api';
 import type { EventOut, ShowOut, VenueOut } from '../types';
 import './Admin.css';
@@ -21,6 +24,20 @@ interface InventoryRow {
   category: string;
   price: string;
   total_seats: string;
+}
+
+interface BarcodeDetectorItem {
+  rawValue?: string;
+}
+
+interface BarcodeDetectorInstance {
+  detect: (source: ImageBitmapSource) => Promise<BarcodeDetectorItem[]>;
+}
+
+type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => BarcodeDetectorInstance;
+
+interface WindowWithBarcodeDetector extends Window {
+  BarcodeDetector?: BarcodeDetectorConstructor;
 }
 
 /* ─── Helpers ─── */
@@ -41,6 +58,26 @@ function apiError(err: unknown): string {
     (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
     'An unexpected error occurred.'
   );
+}
+
+function extractTicketCodeFromScan(rawValue: string): string | null {
+  const trimmed = rawValue.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed) as { ticket_code?: unknown };
+      if (typeof parsed.ticket_code === 'string' && parsed.ticket_code.trim()) {
+        return parsed.ticket_code.trim();
+      }
+    } catch {
+      // Ignore parse errors and fallback to raw text value.
+    }
+  }
+
+  return trimmed;
 }
 
 /* ─── Section: Venues ─── */
@@ -762,21 +799,53 @@ function ShowsSection() {
 function ScannerSection() {
   const [ticketCode, setTicketCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [scanActive, setScanActive] = useState(false);
+  const [scanError, setScanError] = useState('');
   const [result, setResult] = useState<{
     status: string;
     message: string;
     ticket_id?: number;
     booking_id?: number;
+    show_id?: number;
   } | null>(null);
 
-  const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!ticketCode.trim()) return;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanIntervalRef = useRef<number | null>(null);
+  const lastScannedRef = useRef('');
+  const detectingRef = useRef(false);
+  const verifyingRef = useRef(false);
+
+  const stopScanner = useCallback(() => {
+    if (scanIntervalRef.current) {
+      window.clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setScanActive(false);
+    detectingRef.current = false;
+  }, []);
+
+  const verifyTicketCode = useCallback(async (code: string) => {
+    const normalized = code.trim();
+    if (!normalized) {
+      return;
+    }
 
     setLoading(true);
     setResult(null);
+    verifyingRef.current = true;
     try {
-      const { data } = await api.post('/api/admin/verify-ticket', { ticket_code: ticketCode.trim() });
+      const { data } = await api.post('/api/admin/verify-ticket', { ticket_code: normalized });
       setResult(data);
       if (data.status === 'VALID') {
         notify('Ticket verified successfully!', 'success');
@@ -789,9 +858,91 @@ function ScannerSection() {
       notify(errorMsg, 'error');
     } finally {
       setLoading(false);
-      setTicketCode('');
+      verifyingRef.current = false;
     }
+  }, []);
+
+  const startScanner = useCallback(async () => {
+    setScanError('');
+    lastScannedRef.current = '';
+
+    const detectorCtor = (window as WindowWithBarcodeDetector).BarcodeDetector;
+    if (!detectorCtor) {
+      setScanError('Camera scanning is not supported in this browser. Use manual ticket code entry.');
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setScanError('Camera API unavailable in this browser. Use manual ticket code entry.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      const detector = new detectorCtor({ formats: ['qr_code'] });
+      setScanActive(true);
+
+      scanIntervalRef.current = window.setInterval(async () => {
+        if (detectingRef.current || verifyingRef.current) {
+          return;
+        }
+        if (!videoRef.current || videoRef.current.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+          return;
+        }
+
+        detectingRef.current = true;
+        try {
+          const detected = await detector.detect(videoRef.current);
+          const firstValue = detected.find(item => item.rawValue)?.rawValue;
+          if (!firstValue || firstValue === lastScannedRef.current) {
+            return;
+          }
+
+          lastScannedRef.current = firstValue;
+          const extractedCode = extractTicketCodeFromScan(firstValue);
+          if (!extractedCode) {
+            setScanError('Scanned QR is invalid. Try scanning a ticket QR again.');
+            return;
+          }
+
+          setTicketCode(extractedCode);
+          stopScanner();
+          await verifyTicketCode(extractedCode);
+        } catch {
+          // Ignore transient detector errors while camera stream is active.
+        } finally {
+          detectingRef.current = false;
+        }
+      }, 450);
+    } catch {
+      stopScanner();
+      setScanError('Unable to access camera. Allow camera permission and try again.');
+    }
+  }, [stopScanner, verifyTicketCode]);
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketCode.trim()) return;
+
+    await verifyTicketCode(ticketCode.trim());
+    setTicketCode('');
   };
+
+  useEffect(() => {
+    return () => {
+      stopScanner();
+    };
+  }, [stopScanner]);
 
   return (
     <div className="admin-section">
@@ -805,8 +956,51 @@ function ScannerSection() {
       <div className="card" style={{ maxWidth: '500px', margin: '0 auto', marginTop: '2rem' }}>
         <div className="card-body">
           <p style={{ marginBottom: '1.5rem', color: 'var(--clr-muted)' }}>
-            Enter the unique ticket code (from the QR) to verify and mark the ticket as used.
+            Scan ticket QR with camera or enter ticket code manually to approve entry.
           </p>
+
+          <div className="scanner-controls">
+            {!scanActive ? (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={startScanner}
+                id="start-ticket-scan"
+              >
+                <Camera size={16} /> Start Camera Scan
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={stopScanner}
+                id="stop-ticket-scan"
+              >
+                <CameraOff size={16} /> Stop Scan
+              </button>
+            )}
+          </div>
+
+          {scanActive && (
+            <div className="scanner-camera-wrap">
+              <div className="scanner-camera-frame">
+                <video
+                  ref={videoRef}
+                  className="scanner-video"
+                  autoPlay
+                  playsInline
+                  muted
+                />
+                <div className="scanner-overlay">
+                  <ScanLine size={16} /> Align QR code inside the frame
+                </div>
+              </div>
+            </div>
+          )}
+
+          {scanError && <p className="scanner-error">{scanError}</p>}
+
+          <div className="scanner-divider">or</div>
 
           <form onSubmit={handleVerify} className="admin-form">
             <div className="form-group">
@@ -861,6 +1055,7 @@ function ScannerSection() {
               <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', fontSize: '0.9rem', color: 'var(--clr-muted)' }}>
                 {result.ticket_id && <span>Ticket #{result.ticket_id}</span>}
                 {result.booking_id && <span>Booking #{result.booking_id}</span>}
+                {result.show_id && <span>Show #{result.show_id}</span>}
               </div>
             </div>
           )}
