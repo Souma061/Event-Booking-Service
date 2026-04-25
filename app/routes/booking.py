@@ -15,7 +15,7 @@ from app.models.user import User
 from app.models.enums import BookingStatus
 from app.schemas.event import InventoryRowOut, ShowAvailabilityOut
 from app.schemas.booking import BookingCreateRequest,BookingOut
-from app.utils.rate_limit import booking_buckets, get_rate_limit_client_ip
+from app.utils.rate_limit import booking_buckets, get_rate_limit_client_ip, rate_limit_headers
 
 
 router  = APIRouter(prefix="/api/bookings",tags=["bookings"])
@@ -101,7 +101,7 @@ def create_booking(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many booking attempts. Please try again later.",
-            headers={"Retry-After": str(bucket.retry_after_seconds())},
+            headers=rate_limit_headers(bucket),
         )
 
     sorted_items = sorted(payload.items, key=lambda x: x.category)

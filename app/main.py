@@ -1,4 +1,3 @@
-from collections import defaultdict
 import json
 import logging
 
@@ -15,7 +14,7 @@ from app.routes.booking import router as booking_router
 from app.routes.events import router as events_router
 from app.routes.payments import router as payments_router
 from app.routes.admin import router as admin_router
-from app.utils.rate_limit import TokenBucket, get_rate_limit_client_ip, parse_rate_limit
+from app.utils.rate_limit import build_bucket_store, get_rate_limit_client_ip, parse_rate_limit, rate_limit_headers
 
 
 logger = logging.getLogger(__name__)
@@ -61,9 +60,7 @@ logger.info(
 )
 
 default_capacity, default_refill_rate = parse_rate_limit(settings.RATE_LIMIT_DEFAULT)
-default_buckets = defaultdict(
-    lambda: TokenBucket(capacity=default_capacity, refill_rate=default_refill_rate)
-)
+default_buckets = build_bucket_store("default", capacity=default_capacity, refill_rate=default_refill_rate)
 rate_limit_exempt_paths = {
     "/",
     "/health",
@@ -85,7 +82,7 @@ async def apply_default_rate_limit(request: Request, call_next):
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Too many requests. Please try again later."},
-                headers={"Retry-After": str(bucket.retry_after_seconds())},
+                headers=rate_limit_headers(bucket),
             )
 
     return await call_next(request)

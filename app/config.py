@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN: str = "10/minute"
     RATE_LIMIT_BOOKING: str = "5/minute"
     RATE_LIMIT_RECOMMENDATION: str = "20/minute"
+    VALKEY_URL: str | None = None
+    RATE_LIMIT_FAIL_OPEN: bool = True
 
     CASHFREE_APP_ID: str = ""
     CASHFREE_SECRET_KEY: str = ""

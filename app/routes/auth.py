@@ -9,7 +9,7 @@ from app.dependencies.auth import get_current_active_user
 from app.models.user import User
 from app.models.enums import UserRole
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, Userout
-from app.utils.rate_limit import get_rate_limit_client_ip, login_buckets
+from app.utils.rate_limit import get_rate_limit_client_ip, login_buckets, rate_limit_headers
 from app.utils.security import create_access_token, hash_password, verify_password
 
 
@@ -29,7 +29,7 @@ def _authenticate_user(payload: LoginRequest, request: Request, db: Session) -> 
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many login attempts. Please try again later.",
-            headers={"Retry-After": str(bucket.retry_after_seconds())},
+            headers=rate_limit_headers(bucket),
         )
 
     user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
