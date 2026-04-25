@@ -59,8 +59,13 @@ logger.info(
     cors_allow_origin_regex or "<none>",
 )
 
-default_capacity, default_refill_rate = parse_rate_limit(settings.RATE_LIMIT_DEFAULT)
-default_buckets = build_bucket_store("default", capacity=default_capacity, refill_rate=default_refill_rate)
+default_capacity, default_refill_rate, default_window_seconds = parse_rate_limit(settings.RATE_LIMIT_DEFAULT)
+default_buckets = build_bucket_store(
+    "default",
+    capacity=default_capacity,
+    refill_rate=default_refill_rate,
+    window_seconds=default_window_seconds,
+)
 rate_limit_exempt_paths = {
     "/",
     "/health",
