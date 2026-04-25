@@ -61,25 +61,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // The request was made and the server responded with a status code
         // that falls out of the range of 2xx
         if (err.response?.data) {
-          if (typeof err.response.data.detail === 'string') {
-            // FastAPI HTTPException format
-            msg = err.response.data.detail;
-          } else if (Array.isArray(err.response.data.detail)) {
-            // Pydantic validation error format
-            const firstError = err.response.data.detail[0];
-            msg =
-              typeof firstError === 'object' &&
-              firstError !== null &&
-              'msg' in firstError &&
-              typeof (firstError as { msg?: unknown }).msg === 'string'
-                ? (firstError as { msg: string }).msg
-                : 'Invalid input data.';
-          } else {
+          const data = err.response.data;
+          if (typeof data === 'object' && data !== null) {
+            // Check if it's a FastAPI HTTPException format
+            if ('detail' in data && typeof (data as any).detail === 'string') {
+              msg = (data as any).detail;
+            } 
+            // Check if it's a Pydantic validation error format
+            else if ('detail' in data && Array.isArray((data as any).detail)) {
+              const firstError = (data as any).detail[0];
+              msg =
+                typeof firstError === 'object' &&
+                firstError !== null &&
+                'msg' in firstError &&
+                typeof (firstError as { msg?: unknown }).msg === 'string'
+                  ? (firstError as { msg: string }).msg
+                  : 'Invalid input data.';
+            } 
             // Other formats
-            msg = JSON.stringify(err.response.data);
+            else {
+              msg = JSON.stringify(data);
+            }
+          } else {
+            msg = err.response ? `Error ${err.response.status}: ${err.response.statusText}` : 'An error occurred';
           }
         } else {
-          msg = `Error ${err.response.status}: ${err.response.statusText}`;
+          msg = err.response ? `Error ${err.response.status}: ${err.response.statusText}` : 'An error occurred';
         }
       } else if (isAxiosError(err) && !err.response) {
         // The request was made but no response was received
@@ -118,7 +125,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 // Helper function to check if an error is an Axios error
-function isAxiosError(err: unknown): err is { response?: { status: number; statusText: string; data: unknown }; request?: unknown } {
+function isAxiosError(err: unknown): err is { 
+  response?: { 
+    status: number; 
+    statusText: string; 
+    data: unknown 
+  }; 
+  request?: unknown 
+} {
   return (
     typeof err === 'object' &&
     err !== null &&
