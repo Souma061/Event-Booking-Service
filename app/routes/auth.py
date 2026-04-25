@@ -3,6 +3,8 @@ from hmac import compare_digest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import logging
+
 from app.config import settings
 from app.database import get_db
 from app.dependencies.auth import get_current_active_user
@@ -11,6 +13,9 @@ from app.models.enums import UserRole
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, Userout
 from app.utils.rate_limit import get_rate_limit_client_ip, login_buckets, rate_limit_headers
 from app.utils.security import create_access_token, hash_password, verify_password
+
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
@@ -49,47 +54,65 @@ def _token_for_user(user: User) -> TokenResponse:
 
 @router.post("/register", response_model=Userout, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    existing_user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
-    if existing_user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+    try:
+        existing_user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
+        if existing_user:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
-    role = UserRole.CUSTOMER
-    if payload.admin_secret:
-        expected_secret = settings.ADMIN_SECRET_KEY
-        if not expected_secret:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin signup is disabled",
-            )
-        if not compare_digest(payload.admin_secret, expected_secret):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin secret key")
-        role = UserRole.ADMIN
+        role = UserRole.CUSTOMER
+        if payload.admin_secret:
+            expected_secret = settings.ADMIN_SECRET_KEY
+            if not expected_secret:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Admin signup is disabled",
+                )
+            if not compare_digest(payload.admin_secret, expected_secret):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin secret key")
+            role = UserRole.ADMIN
 
-    user = User(
-        full_name = payload.full_name,
-        email = payload.email,
-        phone = payload.phone,
-        password_hash = hash_password(payload.password),
-        role = role
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+        user = User(
+            full_name=payload.full_name,
+            email=payload.email,
+            phone=payload.phone,
+            password_hash=hash_password(payload.password),
+            role=role
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in register: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    user = _authenticate_user(payload, request, db)
-    return _token_for_user(user)
+    try:
+        user = _authenticate_user(payload, request, db)
+        return _token_for_user(user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in login: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.post("/admin/login", response_model=TokenResponse)
 def admin_login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    user = _authenticate_user(payload, request, db)
-    if user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
-    return _token_for_user(user)
+    try:
+        user = _authenticate_user(payload, request, db)
+        if user.role != UserRole.ADMIN:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
+        return _token_for_user(user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in admin login: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.get("/me", response_model=Userout)
