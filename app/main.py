@@ -1,10 +1,12 @@
 import json
 import logging
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import models
 from app.config import settings
@@ -75,7 +77,35 @@ rate_limit_exempt_paths = {
     "/api/payments/cashfree/webhook",
 }
 
+
 app = FastAPI(title=settings.APP_NAME)
+
+
+# Exception handlers to ensure JSON responses for all errors
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
 
 async def apply_default_rate_limit(request: Request, call_next):
     if request.method == "OPTIONS":
@@ -92,6 +122,7 @@ async def apply_default_rate_limit(request: Request, call_next):
 
     return await call_next(request)
 
+
 app.add_middleware(BaseHTTPMiddleware, dispatch=apply_default_rate_limit)
 
 app.add_middleware(
@@ -107,7 +138,6 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
-
 
 
 @app.get("/")
