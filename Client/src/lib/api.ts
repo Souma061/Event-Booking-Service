@@ -20,9 +20,17 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    // Only redirect to login for 401 errors that aren't already on login/register pages
     if (err.response?.status === 401) {
-      localStorage.removeItem('ev_token');
-      window.location.href = '/login';
+      const currentPath = window.location.pathname;
+      const isAuthPage = currentPath.includes('/login') || 
+                        currentPath.includes('/register') ||
+                        currentPath.includes('/admin/login');
+      
+      if (!isAuthPage) {
+        localStorage.removeItem('ev_token');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(err);
   }

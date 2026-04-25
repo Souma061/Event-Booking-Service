@@ -36,8 +36,52 @@ export default function Login() {
       await login(data.access_token);
       navigate(from, { replace: true });
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg || 'Invalid email or password.');
+      // Handle different error response formats
+      let msg = 'Invalid email or password.';
+
+      if (typeof err === 'object' && err !== null && 'response' in err) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        const response = (err as { response?: { data?: unknown; status?: number; statusText?: string } }).response;
+
+        if (response?.data) {
+          const data = response.data;
+
+          if (typeof data === 'object' && data !== null && 'detail' in data) {
+            const detail = (data as { detail?: unknown }).detail;
+
+            if (typeof detail === 'string') {
+              // FastAPI HTTPException format
+              msg = detail;
+            } else if (Array.isArray(detail)) {
+              // Pydantic validation error format
+              const firstError = detail[0];
+              msg =
+                typeof firstError === 'object' &&
+                firstError !== null &&
+                'msg' in firstError &&
+                typeof (firstError as { msg?: unknown }).msg === 'string'
+                  ? (firstError as { msg: string }).msg
+                  : 'Invalid input data.';
+            } else {
+              // Other formats
+              msg = JSON.stringify(data);
+            }
+          } else {
+            msg = JSON.stringify(data);
+          }
+        } else {
+          msg = `Error ${response?.status ?? 'Unknown'}: ${response?.statusText ?? 'Request failed'}`;
+        }
+      } else if (typeof err === 'object' && err !== null && 'request' in err) {
+        // The request was made but no response was received
+        msg = 'Network error. Please check your connection.';
+      } else if (err instanceof Error) {
+        // Something happened in setting up the request
+        msg = err.message || 'An unexpected error occurred.';
+      }
+
+      setError(msg);
     } finally {
       setLoading(false);
     }

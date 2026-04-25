@@ -58,7 +58,7 @@ export default function Register() {
       if (isAdminRegistration && form.admin_secret) {
         payload.admin_secret = form.admin_secret;
       }
-      
+
       await api.post('/api/auth/register', payload);
       // Auto-login
       const { data } = await api.post<TokenResponse>('/api/auth/login', {
@@ -69,8 +69,52 @@ export default function Register() {
       await login(data.access_token);
       setTimeout(() => navigate(from, { replace: true }), 1200);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg || 'Registration failed. Please try again.');
+      // Handle different error response formats
+      let msg = 'Registration failed. Please try again.';
+      
+      if (typeof err === 'object' && err !== null) {
+        const error = err as {
+          response?: {
+            data?: {
+              detail?: unknown;
+            };
+            status: number;
+            statusText: string;
+          };
+          request?: unknown;
+          message?: string;
+        };
+
+        if (error.response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          if (error.response.data) {
+            if (typeof error.response.data.detail === 'string') {
+              // FastAPI HTTPException format
+              msg = error.response.data.detail;
+            } else if (Array.isArray(error.response.data.detail)) {
+              // Pydantic validation error format
+              const firstError = error.response.data.detail[0] as { msg?: string };
+              msg = firstError.msg || 'Invalid input data.';
+            } else {
+              // Other formats
+              msg = JSON.stringify(error.response.data);
+            }
+          } else {
+            msg = `Error ${error.response.status}: ${error.response.statusText}`;
+          }
+        } else if (error.request) {
+          // The request was made but no response was received
+          msg = 'Network error. Please check your connection.';
+        } else {
+          // Something happened in setting up the request
+          msg = error.message || 'An unexpected error occurred.';
+        }
+      } else {
+        msg = 'An unexpected error occurred.';
+      }
+      
+      setError(msg);
     } finally {
       setLoading(false);
     }

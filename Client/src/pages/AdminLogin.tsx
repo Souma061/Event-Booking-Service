@@ -37,8 +37,57 @@ export default function AdminLogin() {
       await login(data.access_token);
       navigate(from, { replace: true });
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg || 'Admin sign in failed.');
+      // Handle different error response formats
+      let msg = 'Admin sign in failed.';
+
+      const isRecord = (value: unknown): value is Record<string, unknown> =>
+        typeof value === 'object' && value !== null;
+
+      if (isRecord(err)) {
+        const response = isRecord(err['response']) ? err['response'] : null;
+
+        if (response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          const data = response['data'];
+
+          if (isRecord(data)) {
+            const detail = data['detail'];
+
+            if (typeof detail === 'string') {
+              // FastAPI HTTPException format
+              msg = detail;
+            } else if (Array.isArray(detail)) {
+              // Pydantic validation error format
+              const firstError = detail[0];
+              if (isRecord(firstError) && typeof firstError['msg'] === 'string') {
+                msg = firstError['msg'];
+              } else {
+                msg = 'Invalid input data.';
+              }
+            } else {
+              // Other formats
+              msg = JSON.stringify(data);
+            }
+          } else {
+            const status = typeof response['status'] === 'number' ? response['status'] : 'Unknown';
+            const statusText = typeof response['statusText'] === 'string' ? response['statusText'] : 'Error';
+            msg = `Error ${status}: ${statusText}`;
+          }
+        } else if (err['request']) {
+          // The request was made but no response was received
+          msg = 'Network error. Please check your connection.';
+        } else if (typeof err['message'] === 'string') {
+          // Something happened in setting up the request
+          msg = err['message'];
+        } else {
+          msg = 'An unexpected error occurred.';
+        }
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+
+      setError(msg);
     } finally {
       setLoading(false);
     }
