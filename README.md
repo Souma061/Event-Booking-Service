@@ -256,6 +256,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Contact
 
-Your Name - [your.email@example.com](mailto:your.email@example.com)
+Soumabrata Ghosh - [soumabrataghosh57@gmail.com](mailto:soumabrataghosh57@gmail.com)
 
-Project Link: [https://github.com/yourusername/Event_Booking_Service](https://github.com/yourusername/Event_Booking_Service)
+Project Link: [https://github.com/Souma061/Event-Booking-Service](https://github.com/yourusername/Event_Booking_Service)
+
+Live Link: [https://event-booking-service.vercel.app/](https://event-booking-service.vercel.app/)
