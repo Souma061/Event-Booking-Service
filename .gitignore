@@ -4,3 +4,9 @@ __pycache__/
 *.pyo
 debug_api.py
 debug_order.py
+.pytest_cache/
+venv/
+.env
+debug_api.py
+debug_order.py
+
