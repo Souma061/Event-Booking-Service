@@ -1,12 +1,14 @@
+import { ArrowRight, Calendar, Mic, Music, Shield, Star, Ticket, Trophy, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Calendar, Zap, Shield, Star, Ticket, Music, Mic, Trophy } from 'lucide-react';
 import './Home.css';
 
+// Switch from hardcoded numeric counts to contextual tags that better
+// represent category characteristics (avoids showing inaccurate numbers).
 const CATEGORIES = [
-  { icon: Music, label: 'Concerts', color: 'var(--clr-accent)', count: '240+' },
-  { icon: Mic, label: 'Comedy Shows', color: 'var(--clr-emerald)', count: '80+' },
-  { icon: Trophy, label: 'Sports', color: 'var(--clr-gold)', count: '150+' },
-  { icon: Star, label: 'Theater', color: 'var(--clr-rose)', count: '60+' },
+  { icon: Music, label: 'Concerts', color: 'var(--clr-accent)', tag: 'Popular' },
+  { icon: Mic, label: 'Comedy Shows', color: 'var(--clr-emerald)', tag: 'Trending' },
+  { icon: Trophy, label: 'Sports', color: 'var(--clr-gold)', tag: 'Seasonal' },
+  { icon: Star, label: 'Theater', color: 'var(--clr-rose)', tag: 'Curated' },
 ];
 
 const FEATURES = [
@@ -87,7 +89,7 @@ export default function Home() {
             <p>Find the type of event that excites you most</p>
           </div>
           <div className="categories-grid">
-            {CATEGORIES.map(({ icon: Icon, label, color, count }) => (
+            {CATEGORIES.map(({ icon: Icon, label, color, tag }) => (
               <Link
                 key={label}
                 to={`/events?category=${label.toLowerCase().replace(' ', '-')}`}
@@ -100,7 +102,7 @@ export default function Home() {
                 </div>
                 <div className="category-info">
                   <h3>{label}</h3>
-                  <span className="category-count">{count} events</span>
+                  <span className="category-tag" style={{ borderColor: color }}>{tag}</span>
                 </div>
                 <ArrowRight size={16} className="category-arrow" />
               </Link>
