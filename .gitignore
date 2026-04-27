@@ -13,3 +13,4 @@ debug_order.py
 test_payment.sh
 docker-compose.yml
 Dockerfile
+docker-compose.yml
