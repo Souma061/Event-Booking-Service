@@ -10,3 +10,4 @@ venv/
 debug_api.py
 debug_order.py
 
+test_payment.sh
