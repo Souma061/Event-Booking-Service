@@ -16,6 +16,7 @@ import Me from './pages/Me';
 import Terms from './pages/Terms';
 import Refund from './pages/Refund';
 import Contact from './pages/Contact';
+import OAuthCallback from './pages/OAuthCallback';
 
 function AppLayout() {
   return (
@@ -56,6 +57,7 @@ function AppLayout() {
         <Route path="/refund" element={<Refund />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="*" element={<NotFound />} />
+        <Route path="/oauth/callback" element={<OAuthCallback />} />
       </Routes>
       <Footer />
     </>

@@ -51,5 +51,13 @@ class Settings(BaseSettings):
     FEATURE_WHATSAPP_ENABLED: bool = False
     FEATURE_LLM_RECOMMENDATIONS: bool = False
 
+    OAUTH_STATE_SECRET: str = Field(default="change_me_in_env")
+
+    OAUTH_FRONTEND_REDIRECT_URL: str = "http://localhost:5173/oauth/callback"
+    BACKEND_BASE_URL: str = "http://localhost:8000"
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
 
 settings = Settings()

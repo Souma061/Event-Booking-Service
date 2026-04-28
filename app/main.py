@@ -17,10 +17,11 @@ from app.routes.events import router as events_router
 from app.routes.payments import router as payments_router
 from app.routes.admin import router as admin_router
 from app.utils.rate_limit import build_bucket_store, get_rate_limit_client_ip, parse_rate_limit, rate_limit_headers
-
+from app.routes.oauth import router as oauth_router
 
 logger = logging.getLogger(__name__)
 _ = models
+
 
 
 def _parse_cors_allow_origins(raw_origins: str) -> list[str]:
@@ -155,3 +156,4 @@ app.include_router(booking_router)
 app.include_router(events_router)
 app.include_router(payments_router)
 app.include_router(admin_router)
+app.include_router(oauth_router)

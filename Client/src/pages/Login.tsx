@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, Ticket, AlertCircle, Shield } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Ticket, AlertCircle, Shield, Github, Chrome } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/useAuth';
 import type { TokenResponse } from '../types';
 import './Auth.css';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export default function Login() {
   const { login } = useAuth();
@@ -21,6 +23,10 @@ export default function Login() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
     setError('');
+  };
+
+  const handleOAuthSignIn = (provider: 'google' | 'github') => {
+    window.location.href = `${API_BASE_URL}/api/auth/${provider}/login`;
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -110,6 +116,29 @@ export default function Login() {
                 <span>{error}</span>
               </div>
             )}
+
+            <div className="oauth-actions" aria-label="Social sign in options">
+              <button
+                type="button"
+                className="oauth-btn"
+                onClick={() => handleOAuthSignIn('google')}
+              >
+                <Chrome size={18} aria-hidden="true" />
+                <span>Continue with Google</span>
+              </button>
+              <button
+                type="button"
+                className="oauth-btn"
+                onClick={() => handleOAuthSignIn('github')}
+              >
+                <Github size={18} aria-hidden="true" />
+                <span>Continue with GitHub</span>
+              </button>
+            </div>
+
+            <div className="auth-divider" aria-hidden="true">
+              <span>or</span>
+            </div>
 
             <form onSubmit={handleSubmit} className="auth-form" noValidate>
               <div className="form-group">
