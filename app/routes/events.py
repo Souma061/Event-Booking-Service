@@ -1,3 +1,4 @@
+import time
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -21,21 +22,57 @@ from app.schemas.event import (
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
 
+# ── Simple in-process TTL cache ──────────────────────────────────────────────
+# Avoids a Redis dependency for read-heavy, low-churn endpoints.
+# TTL=15s means cached data is at most 15s stale — acceptable for event lists.
+_CACHE_TTL = 15  # seconds
+
+_cache: dict[str, tuple[float, list]] = {}   # key -> (expires_at, value)
+
+def _cache_get(key: str):
+    entry = _cache.get(key)
+    if entry and time.monotonic() < entry[0]:
+        return entry[1]
+    return None
+
+def _cache_set(key: str, value: list) -> None:
+    _cache[key] = (time.monotonic() + _CACHE_TTL, value)
+
+def _cache_invalidate(*keys: str) -> None:
+    for k in keys:
+        _cache.pop(k, None)
+
+
+
 @router.get("", response_model=list[EventOut])
 def list_events(db: Session = Depends(get_db)):
-    return db.execute(select(Event).order_by(Event.created_at.desc())).scalars().all()
+    cached = _cache_get("events")
+    if cached is not None:
+        return cached
+    result = db.execute(select(Event).order_by(Event.created_at.desc())).scalars().all()
+    _cache_set("events", result)
+    return result
 
 
 @router.get("/categories", response_model=list[str])
 def list_event_categories(db: Session = Depends(get_db)):
+    cached = _cache_get("categories")
+    if cached is not None:
+        return cached
     rows = db.execute(select(Event.category)).scalars().all()
     categories = sorted({row.strip() for row in rows if row and row.strip()}, key=str.casefold)
+    _cache_set("categories", categories)
     return categories
 
 
 @router.get("/venues", response_model=list[VenueOut])
 def list_venues(db: Session = Depends(get_db)):
-    return db.execute(select(Venue).order_by(Venue.id.desc())).scalars().all()
+    cached = _cache_get("venues")
+    if cached is not None:
+        return cached
+    result = db.execute(select(Venue).order_by(Venue.id.desc())).scalars().all()
+    _cache_set("venues", result)
+    return result
 
 
 @router.get("/venues/{venue_id}", response_model=VenueOut)
@@ -51,6 +88,7 @@ def create_venue(payload: VenueCreate, db: Session = Depends(get_db), _: User = 
     db.add(venue)
     db.commit()
     db.refresh(venue)
+    _cache_invalidate("venues")   # new venue — invalidate immediately
     return venue
 
 @router.post("", response_model=EventOut,status_code=status.HTTP_201_CREATED)
@@ -69,6 +107,7 @@ def create_event(payload: EventCreate, db: Session = Depends(get_db), admin_user
     db.add(event)
     db.commit()
     db.refresh(event)
+    _cache_invalidate("events", "categories")   # new event — invalidate immediately
     return event
 
 

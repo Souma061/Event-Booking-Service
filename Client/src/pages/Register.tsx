@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, Phone, Ticket, AlertCircle, CheckCircle, Shield } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/useAuth';
-import type { TokenResponse } from '../types';
+
 import './Auth.css';
 
 export default function Register() {
@@ -61,12 +61,8 @@ export default function Register() {
 
       await api.post('/api/auth/register', payload);
       // Auto-login
-      const { data } = await api.post<TokenResponse>('/api/auth/login', {
-        email: form.email,
-        password: form.password,
-      });
       setSuccess(true);
-      await login(data.access_token);
+      await login(form.email, form.password);
       setTimeout(() => navigate(from, { replace: true }), 1200);
     } catch (err: unknown) {
       // Handle different error response formats

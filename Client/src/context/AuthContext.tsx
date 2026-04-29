@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import axios from 'axios';
 import api from '../lib/api';
@@ -13,119 +13,105 @@ type FastApiErrorResponse = {
   detail?: string | FastApiValidationError[];
 };
 
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (!axios.isAxiosError(err)) {
+    return err instanceof Error ? err.message : fallback;
+  }
+  if (!err.response) return 'Network error. Please check your connection.';
+  const data = err.response.data as FastApiErrorResponse | undefined;
+  if (!data) return `Error ${err.response.status}: ${err.response.statusText}`;
+  if (typeof data.detail === 'string') return data.detail;
+  if (Array.isArray(data.detail)) {
+    const first = data.detail[0];
+    return typeof first === 'object' && first !== null && typeof (first as { msg?: unknown }).msg === 'string'
+      ? (first as { msg: string }).msg
+      : 'Invalid input data.';
+  }
+  return JSON.stringify(data);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserOut | null>(null);
-  const [token, setToken] = useState<string | null>(
-    () => localStorage.getItem('ev_token')
-  );
-  const [loading, setLoading] = useState(!!localStorage.getItem('ev_token'));
+  const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  /**
+   * Hit /api/auth/me using the existing HTTP-only cookie.
+   * This is the single source of truth for auth state.
+   */
+  const fetchUser = useCallback(async () => {
+    try {
+      const { data } = await api.get<UserOut>('/api/auth/me');
+      setUser(data);
+      setAuthError(null);
+    } catch (err) {
+      setUser(null);
+      if (axios.isAxiosError(err) && err.response?.status !== 401) {
+        setAuthError('Failed to validate session. Please log in again.');
+      }
+      // Re-throw so callers (e.g. OAuthCallback) can catch failures
+      throw err;
+    }
+  }, []);
+
+  // On mount, silently check whether a valid session cookie already exists
+  // (covers page refresh, existing cookie from a previous session).
   useEffect(() => {
-    if (!token) return;
     let cancelled = false;
-    const fetchMe = async () => {
+    const check = async () => {
       try {
         const { data } = await api.get<UserOut>('/api/auth/me');
         if (!cancelled) {
           setUser(data);
           setAuthError(null);
         }
-      } catch (err) {
-        if (!cancelled) {
-          setToken(null);
-          localStorage.removeItem('ev_token');
-          setUser(null);
-          // Don't set authError here for silent token expiration
-          if (axios.isAxiosError(err) && err.response?.status !== 401) {
-            setAuthError('Failed to validate session. Please log in again.');
-          }
-        }
+      } catch {
+        if (!cancelled) setUser(null);
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
-    fetchMe();
+    check();
     return () => { cancelled = true; };
-  }, [token]);
+  }, []);
 
-  const login = async (newToken: string) => {
+  /**
+   * Email/password login.
+   * The backend sets the HTTP-only cookie and returns the Userout object.
+   */
+  const login = useCallback(async (email: string, password: string) => {
     try {
-      localStorage.setItem('ev_token', newToken);
-      setToken(newToken);
-      setAuthError(null);
-      const { data } = await api.get<UserOut>('/api/auth/me', {
-        headers: { Authorization: `Bearer ${newToken}` },
-      });
+      const { data } = await api.post<UserOut>('/api/auth/login', { email, password });
       setUser(data);
+      setAuthError(null);
     } catch (err) {
-      localStorage.removeItem('ev_token');
-      setToken(null);
       setUser(null);
-      
-      // Handle different error response formats
-      let msg = 'Login failed. Please try again.';
-      
-      if (axios.isAxiosError(err)) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        if (!err.response) {
-          // The request was made but no response was received
-          msg = 'Network error. Please check your connection.';
-        } else if (err.response.data) {
-          const data = err.response.data;
-          if (typeof data === 'object' && data !== null) {
-            const errorData = data as FastApiErrorResponse;
-
-            // Check if it's a FastAPI HTTPException format
-            if (typeof errorData.detail === 'string') {
-              msg = errorData.detail;
-            } 
-            // Check if it's a Pydantic validation error format
-            else if (Array.isArray(errorData.detail)) {
-              const firstError = errorData.detail[0];
-              msg =
-                typeof firstError === 'object' &&
-                firstError !== null &&
-                'msg' in firstError &&
-                typeof (firstError as { msg?: unknown }).msg === 'string'
-                  ? (firstError as { msg: string }).msg
-                  : 'Invalid input data.';
-            } 
-            // Other formats
-            else {
-              msg = JSON.stringify(data);
-            }
-          } else {
-            msg = err.response ? `Error ${err.response.status}: ${err.response.statusText}` : 'An error occurred';
-          }
-        } else {
-          msg = err.response ? `Error ${err.response.status}: ${err.response.statusText}` : 'An error occurred';
-        }
-      } else {
-        // Something happened in setting up the request
-        msg = err instanceof Error ? err.message : 'An unexpected error occurred.';
-      }
-      
+      const msg = extractErrorMessage(err, 'Login failed. Please try again.');
       setAuthError(msg);
-      throw new Error(msg); // Re-throw so calling code can handle it
+      throw new Error(msg);
     }
-  };
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem('ev_token');
-    setToken(null);
+  /**
+   * Clears the HTTP-only cookie via the logout endpoint, then clears local state.
+   */
+  const logout = useCallback(async () => {
+    try {
+      await api.post('/api/auth/logout');
+    } catch {
+      // Even if the server call fails, clear local state so the UI reflects logged-out
+    }
     setUser(null);
     setAuthError(null);
-  };
+  }, []);
 
   return (
     <AuthContext.Provider value={{
       user,
-      token,
       loading,
       authError,
       login,
+      fetchUser,
       logout,
       isAuthenticated: !!user,
       isAdmin: user?.role === 'ADMIN',

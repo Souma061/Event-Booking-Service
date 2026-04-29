@@ -7,6 +7,8 @@ from app.config import settings
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
+AUTH_COOKIE_NAME = "ev_auth_token"
+
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)

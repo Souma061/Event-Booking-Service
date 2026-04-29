@@ -1,6 +1,6 @@
 import logging
 import httpx
-from fastapi import APIRouter,Depends, HTTPException
+from fastapi import APIRouter,Depends, HTTPException, Response, Request
 from fastapi.responses import RedirectResponse
 from app.config import settings
 from itsdangerous import URLSafeTimedSerializer,BadSignature,SignatureExpired
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.enums import UserRole
-from app.utils.security import create_access_token
+from app.utils.security import AUTH_COOKIE_NAME, create_access_token
 from  app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,23 @@ def _upsert_user(db: Session, email:str,name:str, provider:str,sub:str) -> User:
 
 def _token_redirect(user: User) -> RedirectResponse:
     token = create_access_token(str(user.id))
-    return RedirectResponse(f"{settings.OAUTH_FRONTEND_REDIRECT_URL}?token={token}")
+    response = RedirectResponse(settings.OAUTH_FRONTEND_REDIRECT_URL)
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="lax",
+        secure=settings.APP_ENV == "prod",
+    )
+    return response
+
+
+def _get_callback_url(request: Request, provider: str) -> str:
+    """Dynamically construct the callback URL based on the incoming request's host"""
+    base_url = str(request.base_url).rstrip("/")
+    return f"{base_url}/api/auth/{provider}/callback"
 
 
 # Google routes
@@ -73,9 +89,9 @@ GOOGLE_TOKEN_URL= "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 
 @router.get("/google/login")
-def google_login():
+def google_login(request: Request):
     state = _sign_state("google")
-    redirect_uri = f"{settings.BACKEND_BASE_URL}/api/auth/google/callback"
+    redirect_uri = _get_callback_url(request, "google")
     params = (
         f"client_id={settings.GOOGLE_CLIENT_ID}"
         f"&redirect_uri={redirect_uri}"
@@ -88,9 +104,9 @@ def google_login():
 
 
 @router.get("/google/callback")
-def google_callback(code:str, state:str,db:Session=Depends(get_db)):
+def google_callback(request: Request, code:str, state:str,db:Session=Depends(get_db)):
     _unsign_state(state)
-    redirect_uri = f"{settings.BACKEND_BASE_URL}/api/auth/google/callback"
+    redirect_uri = _get_callback_url(request, "google")
 
     with httpx.Client() as client:
         # exchange code for tokens
@@ -132,9 +148,9 @@ GITHUB_EMAILS_URL="https://api.github.com/user/emails"
 
 
 @router.get("/github/login")
-def github_login():
+def github_login(request: Request):
     state = _sign_state("github")
-    redirect_uri = f"{settings.BACKEND_BASE_URL}/api/auth/github/callback"
+    redirect_uri = _get_callback_url(request, "github")
     params = (
         f"client_id={settings.GITHUB_CLIENT_ID}"
         f"&redirect_uri={redirect_uri}"
@@ -144,9 +160,9 @@ def github_login():
     return RedirectResponse(GITHUB_AUTH_URL + "?" + params)
 
 @router.get("/github/callback")
-def github_callback(code:str, state:str, db:Session=Depends(get_db)):
+def github_callback(request: Request, code:str, state:str, db:Session=Depends(get_db)):
     _unsign_state(state)
-    redirect_uri = f"{settings.BACKEND_BASE_URL}/api/auth/github/callback"
+    redirect_uri = _get_callback_url(request, "github")
 
     with httpx.Client() as client:
         token_response = client.post(
