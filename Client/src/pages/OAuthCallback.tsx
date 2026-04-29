@@ -1,33 +1,31 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 
 export default function OAuthCallback() {
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { fetchUser } = useAuth();
+    const didRun = useRef(false);
 
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const token = params.get("token");
+        // Prevent double-execution in React StrictMode
+        if (didRun.current) return;
+        didRun.current = true;
 
         const completeLogin = async () => {
-            if (!token) {
-                console.error("OAuth callback did not contain a token.");
-                navigate("/login?error=invalid_token");
-                return;
-            }
-
             try {
-                await login(token);
+                // The backend already set the HTTP-only cookie on the redirect.
+                // We just need to fetch the current user to hydrate the auth state.
+                await fetchUser();
                 navigate("/");
             } catch (err) {
-                console.error("OAuth login failed.", err);
+                console.error("OAuth login failed — could not verify session.", err);
                 navigate("/login?error=oauth_failed");
             }
         };
 
         completeLogin();
-    }, [login, navigate]);
+    }, [fetchUser, navigate]);
 
     return (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>

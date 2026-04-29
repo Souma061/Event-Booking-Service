@@ -130,7 +130,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_allow_origins,
     allow_origin_regex=cors_allow_origin_regex,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -147,7 +147,9 @@ def read_root():
 
 
 @app.get("/health")
-def health_check():
+async def health_check():
+    # async so it yields to the event loop immediately and is never queued
+    # behind sync handlers under high concurrency.
     return {"status": "ok"}
 
 

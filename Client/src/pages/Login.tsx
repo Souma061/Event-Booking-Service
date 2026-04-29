@@ -2,12 +2,11 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Ticket, AlertCircle, Shield, Github, Chrome } from 'lucide-react';
-import api from '../lib/api';
 import { useAuth } from '../context/useAuth';
-import type { TokenResponse } from '../types';
+
 import './Auth.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
 export default function Login() {
   const { login } = useAuth();
@@ -26,7 +25,10 @@ export default function Login() {
   };
 
   const handleOAuthSignIn = (provider: 'google' | 'github') => {
-    window.location.href = `${API_BASE_URL}/api/auth/${provider}/login`;
+    // OAuth login requires a direct browser navigation to the backend (not through Vite proxy),
+    // since Google/GitHub must redirect back to the registered callback on the backend host.
+    const backendUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+    window.location.href = `${backendUrl}/api/auth/${provider}/login`;
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -38,8 +40,7 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post<TokenResponse>('/api/auth/login', form);
-      await login(data.access_token);
+      await login(form.email, form.password);
       navigate(from, { replace: true });
     } catch (err: unknown) {
       // Handle different error response formats

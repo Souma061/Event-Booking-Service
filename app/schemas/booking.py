@@ -7,10 +7,14 @@ class BookingItemIn(BaseModel):
     category: str = Field(min_length=1, max_length=50)
     quantity: int = Field(ge=1, le=100)
 
+    model_config = ConfigDict(str_strip_whitespace=True)
+
 
 class BookingCreateRequest(BaseModel):
     show_id: int
     items:list[BookingItemIn] = Field(min_length=1)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class BookingItemOut(BaseModel):

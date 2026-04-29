@@ -14,3 +14,4 @@ test_payment.sh
 docker-compose.yml
 Dockerfile
 docker-compose.yml
+tests/load/reports/

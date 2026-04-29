@@ -4,11 +4,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff, Lock, Mail, Shield, Ticket } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/useAuth';
-import type { TokenResponse } from '../types';
 import './Auth.css';
 
 export default function AdminLogin() {
-  const { login } = useAuth();
+  const { fetchUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/admin';
@@ -33,8 +32,8 @@ export default function AdminLogin() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post<TokenResponse>('/api/auth/admin/login', form);
-      await login(data.access_token);
+      await api.post('/api/auth/admin/login', form);
+      await fetchUser();
       navigate(from, { replace: true });
     } catch (err: unknown) {
       // Handle different error response formats

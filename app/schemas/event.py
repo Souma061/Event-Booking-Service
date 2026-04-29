@@ -8,6 +8,8 @@ class VenueCreate(BaseModel):
     city: str = Field(min_length=2, max_length=255)
     address: str = Field(min_length=5, max_length=255)
 
+    model_config = ConfigDict(str_strip_whitespace=True)
+
 
 class VenueOut(BaseModel):
     id: int
@@ -22,6 +24,8 @@ class EventCreate(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
     category: str = Field(min_length=2, max_length=100)
     venue_id: int
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
 class EventOut(BaseModel):
     id: int
@@ -39,6 +43,8 @@ class ShowCreate(BaseModel):
     end_at: datetime.datetime
     status: str = Field(default="ACTIVE", max_length=30)
 
+    model_config = ConfigDict(str_strip_whitespace=True)
+
 class ShowOut(BaseModel):
     id: int
     event_id: int
@@ -52,6 +58,8 @@ class InventoryRowIn(BaseModel):
     category: str = Field(min_length=1, max_length=50)
     price: Decimal = Field(gt=0)
     total_seats: int = Field(ge=1,le=50000)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class InventoryRowOut(BaseModel):

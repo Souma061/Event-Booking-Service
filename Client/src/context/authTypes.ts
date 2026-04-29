@@ -3,11 +3,13 @@ import type { UserOut } from '../types';
 
 export interface AuthContextType {
   user: UserOut | null;
-  token: string | null;
   loading: boolean;
   authError: string | null;
-  login: (token: string) => Promise<void>;
-  logout: () => void;
+  /** Used by regular email/password login — sends credentials, backend sets cookie */
+  login: (email: string, password: string) => Promise<void>;
+  /** Fetches /api/auth/me using the existing HTTP-only cookie (used post-OAuth redirect) */
+  fetchUser: () => Promise<void>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
   isAdmin: boolean;
 }

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from hmac import compare_digest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ from app.models.user import User
 from app.models.enums import UserRole
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, Userout
 from app.utils.rate_limit import get_rate_limit_client_ip, login_buckets, rate_limit_headers
-from app.utils.security import create_access_token, hash_password, verify_password
+from app.utils.security import AUTH_COOKIE_NAME, create_access_token, hash_password, verify_password
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ def _get_login_rate_limit_key(request: Request, email: str) -> str:
     return f"{client_ip}:{email.lower()}"
 
 
-def _authenticate_user(payload: LoginRequest, request: Request, db: Session) -> User:
+async def _authenticate_user(payload: LoginRequest, request: Request, db: Session) -> User:
     # Limit attempts per IP + email pair to slow down brute-force login abuse.
     rate_limit_key = _get_login_rate_limit_key(request, payload.email)
     bucket = login_buckets[rate_limit_key]
@@ -38,7 +39,14 @@ def _authenticate_user(payload: LoginRequest, request: Request, db: Session) -> 
         )
 
     user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
-    if not user or not verify_password(payload.password, user.password_hash):
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    # Run CPU-bound password verification in a thread pool so the event loop
+    # is not blocked — other requests can proceed during the hash computation.
+    loop = asyncio.get_running_loop()
+    password_ok = await loop.run_in_executor(None, verify_password, payload.password, user.password_hash)
+    if not password_ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     if not user.is_active:
@@ -47,13 +55,21 @@ def _authenticate_user(payload: LoginRequest, request: Request, db: Session) -> 
     return user
 
 
-def _token_for_user(user: User) -> TokenResponse:
+def _set_auth_cookie(response: Response, user: User) -> None:
     token = create_access_token(str(user.id))
-    return TokenResponse(access_token=token, token_type="bearer")
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="lax",
+        secure=settings.APP_ENV == "prod",
+    )
 
 
 @router.post("/register", response_model=Userout, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     try:
         existing_user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
         if existing_user:
@@ -71,11 +87,15 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin secret key")
             role = UserRole.ADMIN
 
+        # Hash in thread pool — avoids blocking the event loop during CPU-heavy hashing.
+        loop = asyncio.get_running_loop()
+        password_hash = await loop.run_in_executor(None, hash_password, payload.password)
+
         user = User(
             full_name=payload.full_name,
             email=payload.email,
             phone=payload.phone,
-            password_hash=hash_password(payload.password),
+            password_hash=password_hash,
             role=role
         )
         db.add(user)
@@ -89,11 +109,12 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+@router.post("/login", response_model=Userout)
+async def login(payload: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     try:
-        user = _authenticate_user(payload, request, db)
-        return _token_for_user(user)
+        user = await _authenticate_user(payload, request, db)
+        _set_auth_cookie(response, user)
+        return user
     except HTTPException:
         raise
     except Exception as e:
@@ -101,18 +122,30 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
-@router.post("/admin/login", response_model=TokenResponse)
-def admin_login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+@router.post("/admin/login", response_model=Userout)
+async def admin_login(payload: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     try:
-        user = _authenticate_user(payload, request, db)
+        user = await _authenticate_user(payload, request, db)
         if user.role != UserRole.ADMIN:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
-        return _token_for_user(user)
+        _set_auth_cookie(response, user)
+        return user
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Unexpected error in admin login: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(
+        key=AUTH_COOKIE_NAME,
+        httponly=True,
+        samesite="lax",
+        secure=settings.APP_ENV == "prod",
+    )
+    return {"message": "Logged out successfully"}
 
 
 @router.get("/me", response_model=Userout)
