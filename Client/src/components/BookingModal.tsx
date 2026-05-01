@@ -54,6 +54,13 @@ interface CashfreeWindow extends Window {
   Cashfree?: (options: { mode: 'sandbox' | 'production' }) => CashfreeInstance;
 }
 
+const cashfreeMode =
+  import.meta.env.VITE_CASHFREE_MODE === 'production'
+    ? 'production'
+    : import.meta.env.PROD
+      ? 'production'
+      : 'sandbox';
+
 function buildIdempotencyKey(): string {
   return typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
@@ -132,7 +139,7 @@ export default function BookingModal({ show, availability, eventTitle, onClose }
         return;
       }
 
-      const cashfree = cashfreeFactory({ mode: 'production' });
+      const cashfree = cashfreeFactory({ mode: cashfreeMode });
 
       const checkoutOptions = {
         paymentSessionId: paymentOrder.payment_session_id,

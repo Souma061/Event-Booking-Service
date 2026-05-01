@@ -117,6 +117,7 @@ ADMIN_SECRET_KEY=your-admin-secret-key
 ### Frontend (Client/.env)
 ```
 VITE_API_URL=http://localhost:8000
+VITE_CASHFREE_MODE=sandbox
 ```
 
 ## API Endpoints
