@@ -17,10 +17,21 @@ from app.routes.events import router as events_router
 from app.routes.payments import router as payments_router
 from app.routes.admin import router as admin_router
 from app.utils.rate_limit import build_bucket_store, get_rate_limit_client_ip, parse_rate_limit, rate_limit_headers
+from app.routes.refresh import router as refresh_router
+from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.routes.oauth import router as oauth_router
 
 logger = logging.getLogger(__name__)
 _ = models
+
+
+def log_security_event(event_name: str, details: dict, user_id: int | None = None) -> None:
+    logger.info(
+        "security_event=%s user_id=%s details=%s",
+        event_name,
+        user_id,
+        details,
+    )
 
 
 
@@ -101,10 +112,19 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
+    # Log security-relevant exceptions
+    log_security_event("unhandled_exception", {
+        "exception_type": type(exc).__name__,
+        "exception_message": str(exc),
+        "path": str(request.url),
+        "method": request.method,
+        "client": request.client.host if request.client else "unknown"
+    }, request.state.current_user.id if hasattr(request.state, 'current_user') else None)
+
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={"detail": "An error occurred processing your request"},
     )
 
 
@@ -126,13 +146,17 @@ async def apply_default_rate_limit(request: Request, call_next):
 
 app.add_middleware(BaseHTTPMiddleware, dispatch=apply_default_rate_limit)
 
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_allow_origins,
     allow_origin_regex=cors_allow_origin_regex,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    # allow_origin_regex=None,
 )
 
 
@@ -159,3 +183,4 @@ app.include_router(events_router)
 app.include_router(payments_router)
 app.include_router(admin_router)
 app.include_router(oauth_router)
+app.include_router(refresh_router)

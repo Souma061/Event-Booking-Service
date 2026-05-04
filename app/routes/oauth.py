@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.enums import UserRole
-from app.utils.security import AUTH_COOKIE_NAME, create_access_token
+from app.utils.enhanced_security import AUTH_COOKIE_NAME, create_access_token, create_refresh_token
 from  app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,15 @@ def _token_redirect(user: User) -> RedirectResponse:
         httponly=True,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="lax",
+        secure=settings.APP_ENV == "prod",
+    )
+    response.set_cookie(
+        key="ev_refresh_token",
+        value=create_refresh_token(str(user.id)),
+        httponly=True,
+        max_age=30*24*60*60,
+        expires=30*24*60*60,
         samesite="lax",
         secure=settings.APP_ENV == "prod",
     )

@@ -1,5 +1,5 @@
 import time
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from app.schemas.event import (
     VenueCreate,
     VenueOut
     )
+from app.utils.input_validation import InputValidationMiddleware
 
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
@@ -84,6 +85,12 @@ def get_venue(venue_id: int, db: Session = Depends(get_db)):
 
 @router.post("/venues", response_model = VenueOut,status_code=status.HTTP_201_CREATED)
 def create_venue(payload: VenueCreate, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    # Enhanced input validation
+    validator = InputValidationMiddleware()
+    payload.name = validator.validate_full_name(payload.name)
+    payload.city = validator.validate_full_name(payload.city)
+    payload.address = validator.validate_description(payload.address)
+
     venue = Venue(name = payload.name,city = payload.city,address = payload.address)
     db.add(venue)
     db.commit()
@@ -93,6 +100,13 @@ def create_venue(payload: VenueCreate, db: Session = Depends(get_db), _: User = 
 
 @router.post("", response_model=EventOut,status_code=status.HTTP_201_CREATED)
 def create_event(payload: EventCreate, db: Session = Depends(get_db), admin_user : User = Depends(require_admin)):
+    # Enhanced input validation
+    validator = InputValidationMiddleware()
+    payload.title = validator.validate_full_name(payload.title)  # Reuse full name validation for title
+    if payload.description:
+        payload.description = validator.validate_description(payload.description)
+    payload.category = validator.validate_category(payload.category)
+
     venue = db.get(Venue, payload.venue_id)
     if not venue:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid venue_id")

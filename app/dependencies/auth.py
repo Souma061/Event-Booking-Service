@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.enums import UserRole
 from app.models.user import User
-from app.utils.security import AUTH_COOKIE_NAME, verify_access_token
+from app.utils.enhanced_security import AUTH_COOKIE_NAME, verify_access_token
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:

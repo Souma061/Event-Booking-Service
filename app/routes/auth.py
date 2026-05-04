@@ -13,14 +13,13 @@ from app.models.user import User
 from app.models.enums import UserRole
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, Userout
 from app.utils.rate_limit import get_rate_limit_client_ip, login_buckets, rate_limit_headers
-from app.utils.security import AUTH_COOKIE_NAME, create_access_token, hash_password, verify_password
-
+from app.utils.enhanced_security import AUTH_COOKIE_NAME, create_access_token, hash_password, verify_password, create_refresh_token
+from app.utils.input_validation import InputValidationMiddleware
+from app.utils.security_utils import log_security_event
 
 logger = logging.getLogger(__name__)
 
-
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
-
 
 def _get_login_rate_limit_key(request: Request, email: str) -> str:
     client_ip = get_rate_limit_client_ip(request)
@@ -32,6 +31,12 @@ async def _authenticate_user(payload: LoginRequest, request: Request, db: Sessio
     rate_limit_key = _get_login_rate_limit_key(request, payload.email)
     bucket = login_buckets[rate_limit_key]
     if not bucket.allow():
+        # Log rate limit breach
+        log_security_event("rate_limit_breach", {
+            "endpoint": "login",
+            "client_ip": get_rate_limit_client_ip(request),
+            "email": payload.email
+        })
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many login attempts. Please try again later.",
@@ -40,17 +45,23 @@ async def _authenticate_user(payload: LoginRequest, request: Request, db: Sessio
 
     user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     # Run CPU-bound password verification in a thread pool so the event loop
-    # is not blocked — other requests can proceed during the hash computation.
+    # is not blocked - other requests can proceed during the hash computation.
     loop = asyncio.get_running_loop()
     password_ok = await loop.run_in_executor(None, verify_password, payload.password, user.password_hash)
     if not password_ok:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+        # Log failed password attempt
+        log_security_event("failed_login", {
+            "reason": "invalid_password",
+            "email": payload.email,
+            "client_ip": request.client.host if request.client else "unknown"
+        })
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Account is inactive")
 
     return user
 
@@ -67,27 +78,43 @@ def _set_auth_cookie(response: Response, user: User) -> None:
         secure=settings.APP_ENV == "prod",
     )
 
+    # Set refresh token cookie
+    refresh_token = create_refresh_token(str(user.id))
+    response.set_cookie(
+        key="ev_refresh_token",
+        value=refresh_token,
+        httponly=True,
+        max_age=30*24*60*60,  # 30 days
+        expires=30*24*60*60,
+        samesite="lax",
+        secure=settings.APP_ENV == "prod",
+    )
+
 
 @router.post("/register", response_model=Userout, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     try:
+        # Enhanced input validation
+        validator = InputValidationMiddleware()
+        payload.full_name = validator.validate_full_name(payload.full_name)
+
         existing_user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
         if existing_user:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
         role = UserRole.CUSTOMER
         if payload.admin_secret:
             expected_secret = settings.ADMIN_SECRET_KEY
             if not expected_secret:
                 raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
+                    status.HTTP_403_FORBIDDEN,
                     detail="Admin signup is disabled",
                 )
             if not compare_digest(payload.admin_secret, expected_secret):
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin secret key")
+                raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Invalid admin secret key")
             role = UserRole.ADMIN
 
-        # Hash in thread pool — avoids blocking the event loop during CPU-heavy hashing.
+        # Hash in thread pool - avoids blocking the event loop during CPU-heavy hashing.
         loop = asyncio.get_running_loop()
         password_hash = await loop.run_in_executor(None, hash_password, payload.password)
 
@@ -106,7 +133,7 @@ async def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Unexpected error in register: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.post("/login", response_model=Userout)
@@ -119,7 +146,7 @@ async def login(payload: LoginRequest, request: Request, response: Response, db:
         raise
     except Exception as e:
         logger.error(f"Unexpected error in login: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.post("/admin/login", response_model=Userout)
@@ -127,14 +154,14 @@ async def admin_login(payload: LoginRequest, request: Request, response: Respons
     try:
         user = await _authenticate_user(payload, request, db)
         if user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
         _set_auth_cookie(response, user)
         return user
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Unexpected error in admin login: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.post("/logout")
@@ -145,9 +172,10 @@ def logout(response: Response):
         samesite="lax",
         secure=settings.APP_ENV == "prod",
     )
+    response.delete_cookie(
+        key="ev_refresh_token",
+        httponly=True,
+        samesite="lax",
+        secure=settings.APP_ENV == "prod",
+    )
     return {"message": "Logged out successfully"}
-
-
-@router.get("/me", response_model=Userout)
-def get_current_user(current_user: User = Depends(get_current_active_user)):
-    return current_user
