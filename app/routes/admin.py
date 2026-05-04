@@ -86,8 +86,12 @@ class MigrationResponse(BaseModel):
 
 
 @router.post("/run-migrations", response_model=MigrationResponse)
-def run_migrations(admin_user=Depends(require_admin)):
+def run_migrations(admin_secret: str):
     """One-time admin endpoint to run pending Alembic migrations."""
+    from app.config import settings
+    from fastapi import HTTPException
+    if admin_secret != settings.ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
     cwd = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     output_messages = []
 
