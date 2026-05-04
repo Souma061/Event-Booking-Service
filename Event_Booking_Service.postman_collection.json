@@ -1,0 +1,201 @@
+{
+  "info": {
+    "name": "Event Booking Service API",
+    "description": "API Documentation and test requests for the Event Booking Service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"StrongPassword123!\",\n  \"full_name\": \"Test User\",\n  \"phone\": \"+919876543210\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login (Sets HTTP-Only Cookie)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "username", "value": "testuser@example.com", "type": "text" },
+                { "key": "password", "value": "StrongPassword123!", "type": "text" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Events & Shows",
+      "item": [
+        {
+          "name": "Get All Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/events",
+              "host": ["{{base_url}}"],
+              "path": ["api", "events"]
+            }
+          }
+        },
+        {
+          "name": "Get Show Availability",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/bookings/shows/1/availability",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings", "shows", "1", "availability"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Booking Flow",
+      "item": [
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "unique-key-12345" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/bookings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"show_id\": 1,\n  \"items\": [\n    {\n      \"category\": \"VIP\",\n      \"quantity\": 2\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Get My Bookings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/bookings/mine",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings", "mine"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Payments",
+      "item": [
+        {
+          "name": "Create Payment Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payments/orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "orders"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"booking_id\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/payments/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "verify"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"booking_id\": 1,\n  \"provider_order_id\": \"order_1_abcdef\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Real-Time (WebSockets)",
+      "item": [
+        {
+          "name": "Kafka Notifications WebSocket",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:8000/ws/notifications/1",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["ws", "notifications", "1"]
+            },
+            "description": "Connect to this WebSocket using Postman's 'WebSocket Request' feature to receive real-time push notifications from Kafka when a payment is verified. Replace '1' with your User ID."
+          }
+        }
+      ]
+    }
+  ]
+}
