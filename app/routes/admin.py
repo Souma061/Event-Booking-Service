@@ -88,22 +88,37 @@ class MigrationResponse(BaseModel):
 @router.post("/run-migrations", response_model=MigrationResponse)
 def run_migrations(admin_user=Depends(require_admin)):
     """One-time admin endpoint to run pending Alembic migrations."""
-    alembic_cfg = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "alembic.ini")
+    cwd = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    output_messages = []
+
+    try:
+        from app.database import engine
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        if "alembic_version" not in tables and "users" in tables:
+            # Database was created by create_all(), so stamp the initial migration
+            stamp = subprocess.run(
+                [sys.executable, "-m", "alembic", "stamp", "126b25d4eb52"],
+                capture_output=True, text=True, cwd=cwd
+            )
+            output_messages.append(f"Stamping initial schema: {stamp.stdout.strip() or stamp.stderr.strip()}")
+    except Exception as e:
+        output_messages.append(f"Auto-stamp check failed: {e}")
+
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
-        capture_output=True,
-        text=True,
-        cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        capture_output=True, text=True, cwd=cwd
     )
 
     if result.returncode == 0:
-        output = result.stdout.strip()
+        output_messages.append(result.stdout.strip() or "No migrations to apply")
         return MigrationResponse(
             status="success",
-            message=output or "No migrations to apply",
+            message="\n".join(output_messages),
         )
 
     return MigrationResponse(
         status="error",
-        message=f"Migration failed: {result.stderr or result.stdout}",
+        message=f"Migration failed: {result.stderr or result.stdout}\nPrevious logs: {output_messages}",
     )
