@@ -1,6 +1,10 @@
+import subprocess
+import sys
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies.auth import require_admin
@@ -72,4 +76,34 @@ def verify_ticket(
         ticket_id=ticket.id,
         booking_id=ticket.booking_id,
         show_id=ticket.show_id
+    )
+
+
+class MigrationResponse(BaseModel):
+    status: str
+    message: str
+    applied: list[str] = []
+
+
+@router.post("/run-migrations", response_model=MigrationResponse)
+def run_migrations(admin_user=Depends(require_admin)):
+    """One-time admin endpoint to run pending Alembic migrations."""
+    alembic_cfg = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "alembic.ini")
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        capture_output=True,
+        text=True,
+        cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    )
+
+    if result.returncode == 0:
+        output = result.stdout.strip()
+        return MigrationResponse(
+            status="success",
+            message=output or "No migrations to apply",
+        )
+
+    return MigrationResponse(
+        status="error",
+        message=f"Migration failed: {result.stderr or result.stdout}",
     )
