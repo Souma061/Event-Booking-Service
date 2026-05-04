@@ -19,3 +19,4 @@ redis>=5.0.0
 fakeredis>=2.20
 authlib>=1.0.0
 itsdangerous>=2.0.1
+bleach>=6.1.0

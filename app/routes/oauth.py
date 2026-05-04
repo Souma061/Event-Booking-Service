@@ -87,8 +87,8 @@ def _token_redirect(user: User) -> RedirectResponse:
 
 
 def _get_callback_url(request: Request, provider: str) -> str:
-    """Dynamically construct the callback URL based on the incoming request's host"""
-    base_url = str(request.base_url).rstrip("/")
+    """Construct the callback URL based on the configured backend base URL"""
+    base_url = settings.BACKEND_BASE_URL.rstrip("/")
     return f"{base_url}/api/auth/{provider}/callback"
 
 
