@@ -20,4 +20,3 @@ class PaymentVerificationOut(BaseModel):
     booking_id: int
     status: str
     ticket_codes: list[str] = Field(default_factory=list)
-    
