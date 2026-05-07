@@ -22,7 +22,8 @@ from app.middleware.security_headers import SecurityHeadersMiddleware
 import asyncio
 from app.routes.oauth import router as oauth_router
 from app.routes.notifications import router as notifications_router
-from app.services.kafka_consumer import consume_notifications
+from app.services.kafka_consumer import consume_notifications, kafka_notification_consumer
+from app.services.kafka_producer import kafka_notification_producer
 
 logger = logging.getLogger(__name__)
 _ = models
@@ -94,6 +95,7 @@ rate_limit_exempt_paths = {
 
 
 app = FastAPI(title=settings.APP_NAME)
+notification_consumer_task: asyncio.Task | None = None
 
 
 # Exception handlers to ensure JSON responses for all errors
@@ -164,9 +166,23 @@ app.add_middleware(
 
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
+    global notification_consumer_task
     Base.metadata.create_all(bind=engine)
-    asyncio.create_task(consume_notifications())
+    asyncio.create_task(kafka_notification_producer.start())
+    notification_consumer_task = asyncio.create_task(consume_notifications())
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    if notification_consumer_task:
+        notification_consumer_task.cancel()
+        try:
+            await notification_consumer_task
+        except asyncio.CancelledError:
+            pass
+    await kafka_notification_consumer.stop()
+    await kafka_notification_producer.stop()
 
 
 @app.get("/")

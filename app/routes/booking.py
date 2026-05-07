@@ -16,6 +16,8 @@ from app.models.user import User
 from app.models.enums import BookingStatus
 from app.schemas.event import InventoryRowOut, ShowAvailabilityOut
 from app.schemas.booking import BookingCreateRequest,BookingOut
+from app.schemas.notification import NotificationEventType, NotificationPriority
+from app.services.kafka_producer import send_notification
 from app.utils.rate_limit import booking_buckets, get_rate_limit_client_ip, rate_limit_headers
 
 
@@ -40,6 +42,14 @@ async def expire_unpaid_booking(booking_id: int):
                     inventory.available_seats += item.quantity
             booking.status = BookingStatus.CANCELLED
             db.commit()
+            await send_notification(
+                booking.user_id,
+                f"Booking #{booking.id} expired because payment was not completed.",
+                event_type=NotificationEventType.BOOKING_EXPIRED,
+                booking_id=booking.id,
+                data={"show_id": booking.show_id},
+                priority=NotificationPriority.HIGH,
+            )
     except Exception as e:
         db.rollback()
         print(f"Error expiring booking {booking_id}: {e}")
@@ -159,6 +169,27 @@ def create_booking(
         db.refresh(booking)
         
         background_tasks.add_task(expire_unpaid_booking, booking.id)
+        background_tasks.add_task(
+            send_notification,
+            booking.user_id,
+            f"Booking #{booking.id} created. Complete payment to confirm your tickets.",
+            event_type=NotificationEventType.BOOKING_CREATED,
+            booking_id=booking.id,
+            data={
+                "show_id": booking.show_id,
+                "total_amount": str(booking.total_amount),
+                "currency": booking.currency,
+                "items": [
+                    {
+                        "category": item.category,
+                        "quantity": item.quantity,
+                        "line_total": str(item.line_total),
+                    }
+                    for item in booking.items
+                ],
+            },
+            priority=NotificationPriority.NORMAL,
+        )
         
         return booking
     except OperationalError:

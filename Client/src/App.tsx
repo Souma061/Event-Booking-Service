@@ -17,11 +17,13 @@ import Terms from './pages/Terms';
 import Refund from './pages/Refund';
 import Contact from './pages/Contact';
 import OAuthCallback from './pages/OAuthCallback';
+import NotificationToaster from './components/NotificationToaster';
 
 function AppLayout() {
   return (
     <>
       <Navbar />
+      <NotificationToaster />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />

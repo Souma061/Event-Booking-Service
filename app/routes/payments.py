@@ -19,6 +19,7 @@ from app.schemas.payment import (
     PaymentVerificationOut,
     PaymentVerificationRequest,
 )
+from app.schemas.notification import NotificationEventType, NotificationPriority
 from app.services.email_services import send_booking_confirmation_email_sync
 from app.services.cashfree_service import cashfree_service
 from app.services.kafka_producer import send_notification
@@ -334,7 +335,14 @@ def verify_payment(
         background_tasks.add_task(
             send_notification,
             booking.user_id,
-            f"Payment successful! Booking #{booking.id} confirmed."
+            f"Payment successful! Booking #{booking.id} confirmed.",
+            event_type=NotificationEventType.PAYMENT_SUCCESS,
+            booking_id=booking.id,
+            data={
+                "provider_order_id": payload.provider_order_id,
+                "ticket_codes": result.ticket_codes,
+            },
+            priority=NotificationPriority.HIGH,
         )
 
     if current_user.email and result.ticket_codes and not was_already_captured:
@@ -411,7 +419,14 @@ async def cashfree_webhook(
         background_tasks.add_task(
             send_notification,
             payment.booking.user_id,
-            f"Payment successful! Booking #{booking_id} confirmed."
+            f"Payment successful! Booking #{booking_id} confirmed.",
+            event_type=NotificationEventType.PAYMENT_SUCCESS,
+            booking_id=booking_id,
+            data={
+                "provider_order_id": provider_order_id,
+                "ticket_codes": result.ticket_codes,
+            },
+            priority=NotificationPriority.HIGH,
         )
 
     if (

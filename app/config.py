@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     FEATURE_WHATSAPP_ENABLED: bool = False
     FEATURE_LLM_RECOMMENDATIONS: bool = False
 
+    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
+    KAFKA_NOTIFICATION_TOPIC: str = "notification.requested"
+    KAFKA_DLQ_TOPIC: str = "notification.dlq"
+    KAFKA_CONSUMER_GROUP: str = "notification-service"
+    KAFKA_AUTO_OFFSET_RESET: str = "earliest"
+    KAFKA_ENABLE_NOTIFICATIONS: bool = True
+    KAFKA_PRODUCER_RETRIES: int = 3
+    KAFKA_PRODUCER_RETRY_BACKOFF_SECONDS: float = 0.5
+    NOTIFICATION_DEFAULT_CHANNELS: str = "websocket"
+
     OAUTH_STATE_SECRET: str = Field(default="change_me_in_env")
 
     OAUTH_FRONTEND_REDIRECT_URL: str = "http://localhost:5173/oauth/callback"

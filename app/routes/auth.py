@@ -8,7 +8,7 @@ import logging
 
 from app.config import settings
 from app.database import get_db
-from app.dependencies.auth import get_current_active_user
+from app.dependencies.auth import get_current_active_user, require_admin
 from app.models.user import User
 from app.models.enums import UserRole
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, Userout
@@ -179,3 +179,16 @@ def logout(response: Response):
         secure=settings.APP_ENV == "prod",
     )
     return {"message": "Logged out successfully"}
+
+
+@router.get("/me", response_model=Userout)
+def get_logged_in_user(current_user: User = Depends(get_current_active_user)):
+    return current_user
+
+
+@router.get("/users", response_model=list[Userout])
+def list_users(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return db.execute(select(User).order_by(User.id.asc())).scalars().all()
