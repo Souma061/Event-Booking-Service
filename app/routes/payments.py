@@ -21,6 +21,7 @@ from app.schemas.payment import (
 )
 from app.services.email_services import send_booking_confirmation_email_sync
 from app.services.cashfree_service import cashfree_service
+from app.services.kafka_producer import send_notification
 from app.services.qr_services import build_ticket_payload, generate_qr_base64
 
 
@@ -328,6 +329,14 @@ def verify_payment(
         provider_order_id=payload.provider_order_id,
         cf_order=cf_order,
     )
+    if result.status == BookingStatus.CONFIRMED.value and not was_already_captured:
+        # Kafka Push Notification
+        background_tasks.add_task(
+            send_notification,
+            booking.user_id,
+            f"Payment successful! Booking #{booking.id} confirmed."
+        )
+
     if current_user.email and result.ticket_codes and not was_already_captured:
         background_tasks.add_task(
             send_booking_confirmation_email_sync,
@@ -396,6 +405,14 @@ async def cashfree_webhook(
         terminal_failure=payment_status in FAILED_PAYMENT_STATUSES,
         raise_on_incomplete=False,
     )
+
+    if result.status == BookingStatus.CONFIRMED.value and not was_already_captured:
+        # Kafka Push Notification
+        background_tasks.add_task(
+            send_notification,
+            payment.booking.user_id,
+            f"Payment successful! Booking #{booking_id} confirmed."
+        )
 
     if (
         result.status == BookingStatus.CONFIRMED.value

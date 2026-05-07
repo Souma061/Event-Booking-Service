@@ -19,7 +19,10 @@ from app.routes.admin import router as admin_router
 from app.utils.rate_limit import build_bucket_store, get_rate_limit_client_ip, parse_rate_limit, rate_limit_headers
 from app.routes.refresh import router as refresh_router
 from app.middleware.security_headers import SecurityHeadersMiddleware
+import asyncio
 from app.routes.oauth import router as oauth_router
+from app.routes.notifications import router as notifications_router
+from app.services.kafka_consumer import consume_notifications
 
 logger = logging.getLogger(__name__)
 _ = models
@@ -163,6 +166,7 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+    asyncio.create_task(consume_notifications())
 
 
 @app.get("/")
@@ -184,3 +188,4 @@ app.include_router(payments_router)
 app.include_router(admin_router)
 app.include_router(oauth_router)
 app.include_router(refresh_router)
+app.include_router(notifications_router)
