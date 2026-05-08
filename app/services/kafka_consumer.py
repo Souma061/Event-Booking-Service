@@ -75,11 +75,13 @@ class KafkaNotificationConsumer:
             payload = json.loads(message.value.decode("utf-8"))
             event = NotificationEvent.model_validate(payload)
             await notification_router.route_event(event)
-            await self._consumer.commit()
+            if self._consumer:
+                await self._consumer.commit()
         except Exception as exc:
             logger.exception("Failed to process notification message")
             await self.publish_to_dlq(message, exc)
-            await self._consumer.commit()
+            if self._consumer:
+                await self._consumer.commit()
 
     async def publish_to_dlq(self, message: Any, error: Exception) -> None:
         if not self._producer:

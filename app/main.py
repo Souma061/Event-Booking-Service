@@ -21,6 +21,7 @@ from app.routes.refresh import router as refresh_router
 from app.middleware.security_headers import SecurityHeadersMiddleware
 import asyncio
 from app.routes.oauth import router as oauth_router
+from app.routes.notifications import api_router as notifications_api_router
 from app.routes.notifications import router as notifications_router
 from app.services.kafka_consumer import consume_notifications, kafka_notification_consumer
 from app.services.kafka_producer import kafka_notification_producer
@@ -205,3 +206,4 @@ app.include_router(admin_router)
 app.include_router(oauth_router)
 app.include_router(refresh_router)
 app.include_router(notifications_router)
+app.include_router(notifications_api_router)
